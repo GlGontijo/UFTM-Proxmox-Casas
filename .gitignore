@@ -1,0 +1,23 @@
+# Dados reais dos hosts (IPs WAN, endpoints WireGuard, chaves privadas)
+# NUNCA devem ser versionados. Use data/hosts.csv.example como modelo.
+data/hosts.csv
+data/*.csv
+!data/*.csv.example
+
+# Chaves e material sensível
+*.key
+*.priv
+*.pem
+wg-keys.cfg
+id_rsa*
+id_ed25519*
+
+# Backups gerados pelos próprios scripts (sources.list.bak, etc)
+*.bak
+
+# Logs locais
+*.log
+
+# Arquivos de SO / editor
+.DS_Store
+*.swp
