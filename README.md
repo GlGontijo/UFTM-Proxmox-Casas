@@ -1,5 +1,7 @@
 # UFTM-Proxmox-Casas
 
+[![proxmox](https://img.shields.io/badge/proxmox-proxmox-0072C6?style=flat-square)](https://github.com/topics/proxmox) [![opnsense](https://img.shields.io/badge/opnsense-opnsense-F7931E?style=flat-square)](https://github.com/topics/opnsense) [![evpn](https://img.shields.io/badge/evpn-evpn-4C6EF5?style=flat-square)](https://github.com/search?q=evpn&type=repositories) [![wireguard](https://img.shields.io/badge/wireguard-wireguard-2CA01C?style=flat-square)](https://github.com/topics/wireguard) [![brasil](https://img.shields.io/badge/brasil-brasil-FFCC00?style=flat-square)](https://github.com/search?q=brasil&type=repositories) [![universidade-federal](https://img.shields.io/badge/universidade--federal-universidade--federal-6f42c1?style=flat-square)](https://github.com/search?q=%22universidade+federal%22&type=repositories)
+
 Automação de instalação e configuração de rede overlay (WireGuard Fabric +
 EVPN/VXLAN) para os hosts Proxmox VE 9 da UFTM (matriz e filiais/"casas").
 
