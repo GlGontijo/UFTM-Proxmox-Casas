@@ -53,20 +53,73 @@ echo " VM ID:        ${VM_ID}"
 echo "======================================================================"
 
 # ------------------------------------------------------------------------------
-# 1. DOWNLOAD E PREPARAÇÃO DA IMAGEM
+# 1. VERIFICAÇÃO LOCAL E DOWNLOAD SOB DEMANDA (WITH RESUME -c)
 # ------------------------------------------------------------------------------
 TEMP_DIR="/tmp/opnsense_deploy_${VM_ID}"
 mkdir -p "${TEMP_DIR}"
 cd "${TEMP_DIR}"
 
-echo "[1/6] Baixando e descomprimindo imagem..."
-wget -q --show-progress -O "${IMG_NAME}.bz2" "${MIRROR_URL}/${OPNSENSE_VER}/${IMG_NAME}.bz2"
+MAX_ATTEMPTS=5
+ATTEMPT=1
+
+echo "[1/6] Iniciando verificação e download da imagem OPNsense..."
+echo "-> Tentativa ${ATTEMPT} de ${MAX_ATTEMPTS}..."
+
+while true; do
+  if [ "${ATTEMPT}" -gt "${MAX_ATTEMPTS}" ]; then
+    echo "[ERRO CRÍTICO] Número máximo de tentativas (${MAX_ATTEMPTS}) atingido. Abortando." >&2
+    rm -rf "${TEMP_DIR}"
+    exit 1
+  elif [ "${ATTEMPT}" -gt 1 ]; then
+    echo "-> Tentativa ${ATTEMPT} de ${MAX_ATTEMPTS}..."
+  fi
+
+  # Garante que o arquivo de checksums oficial exista para consulta
+  if [ ! -f "checksums.sha256" ]; then
+    echo "   Baixando arquivo de checksums oficial..."
+    wget -q -O "checksums.sha256" "${MIRROR_URL}/${OPNSENSE_VER}/OPNsense-${OPNSENSE_VER}-checksums-amd64.sha256" || true
+  fi
+
+  # Se o arquivo existe em disco, valida integridade física e hash ANTES de baixar
+  if [ -f "${IMG_NAME}.bz2" ]; then
+    # Checa se é um bzip2 válido
+    if [ -s "${IMG_NAME}.bz2" ] && file "${IMG_NAME}.bz2" | grep -q "bzip2 compressed data"; then
+      EXPECTED_HASH=$(grep -F "${IMG_NAME}.bz2" checksums.sha256 2>/dev/null | awk -F'= ' '{print $2}' | tr -d ' \r\n')
+      LOCAL_HASH=$(sha256sum "${IMG_NAME}.bz2" 2>/dev/null | awk '{print $1}' | tr -d ' \r\n')
+
+      if [ -n "${EXPECTED_HASH}" ] && [ "${EXPECTED_HASH}" = "${LOCAL_HASH}" ]; then
+        echo "   [SUCESSO] Arquivo local verificado com sucesso!"
+        echo "   Hash SHA256: ${LOCAL_HASH}"
+        break
+      else
+        echo "   [AVISO] Arquivo local existe mas o checksum divergiu ou está incompleto."
+        echo "     Esperado: ${EXPECTED_HASH:-'Não encontrado'}"
+        echo "     Obtido:   ${LOCAL_HASH:-'Erro ao calcular'}"
+      fi
+    else
+      echo "   [AVISO] Arquivo local encontrado, porém está vazio ou corrompido."
+      ATTEMPT=$((ATTEMPT + 1))
+      continue
+      sleep 2
+    fi
+  else
+    echo "   Arquivo ${IMG_NAME}.bz2 não encontrado localmente."
+  fi
+
+  # Executa/Retoma (-c) o download
+  echo "   Baixando/retomando download de ${IMG_NAME}.bz2..."
+  wget -c -q --show-progress -O "${IMG_NAME}.bz2" "${MIRROR_URL}/${OPNSENSE_VER}/${IMG_NAME}.bz2" || true
+
+done
+
+# Descompressão após validação confirmada pelo 'break'
+echo "[2/6] Descomprimindo a imagem..."
 bunzip2 -f "${IMG_NAME}.bz2"
 
 # ------------------------------------------------------------------------------
 # 2. CRIAÇÃO DA VM COM SUPORTE A CONSOLE SERIAL
 # ------------------------------------------------------------------------------
-echo "[2/6] Criando estrutura da VM (${VM_NAME})..."
+echo "[3/6] Criando estrutura da VM (${VM_NAME})..."
 qm create "${VM_ID}" \
   --name "${VM_NAME}" \
   --ostype l26 \
@@ -83,7 +136,7 @@ qm create "${VM_ID}" \
 # ------------------------------------------------------------------------------
 # 3. IMPORTAÇÃO E EXPANSÃO DO DISCO
 # ------------------------------------------------------------------------------
-echo "[3/6] Importando e vinculando o disco..."
+echo "[4/6] Importando e vinculando o disco..."
 qm importdisk "${VM_ID}" "${IMG_NAME}" "${STORAGE}"
 qm set "${VM_ID}" --virtio0 "${STORAGE}:vm-${VM_ID}-disk-0"
 qm resize "${VM_ID}" virtio0 "${DISK_EXPAND}"
@@ -95,16 +148,16 @@ cd /tmp && rm -rf "${TEMP_DIR}"
 # ------------------------------------------------------------------------------
 # 4. INICIALIZAÇÃO DA VM
 # ------------------------------------------------------------------------------
-echo "[4/6] Ligando a VM para automação do boot..."
+echo "[5/6] Ligando a VM para automação do boot..."
 qm start "${VM_ID}"
 
-echo "[5/6] Aguardando a inicialização do FreeBSD no console (pode levar ~40s)..."
+echo "   Aguardando a inicialização do FreeBSD no console (pode levar ~40s)..."
 sleep 40
 
 # ------------------------------------------------------------------------------
-# 5. AUTOMAÇÃO VIA EXPECT (GPART EXPANSION)
+# 5. AUTOMAÇÃO VIA EXPECT (HANDSHAKE NETWORK ASSIGNMENT + GPART)
 # ------------------------------------------------------------------------------
-echo "[6/6] Executando rotina gpart via Console Serial..."
+echo "[6/6] Executando rotina de ajuste via Console Serial..."
 
 expect << EOF
 set timeout 60
@@ -113,7 +166,33 @@ spawn qm terminal ${VM_ID}
 
 send "\r"
 
+# Loop dinâmico para lidar com assistentes de boot inicial e login
 expect {
+    # Caso caia na pergunta de LAGGs
+    -re "Do you want to configure LAGGs now.*" {
+        send "n\r"
+        exp_continue
+    }
+    # Caso caia na pergunta de VLANs
+    -re "Do you want to configure VLANs now.*" {
+        send "n\r"
+        exp_continue
+    }
+    # Caso peça a interface WAN/LAN diretamente no wizard
+    -re "Enter the WAN interface name.*" {
+        send "vnet0\r"
+        exp_continue
+    }
+    -re "Enter the LAN interface name.*" {
+        send "vnet1\r"
+        exp_continue
+    }
+    # Caso pergunte se deseja prosseguir
+    -re "Do you want to proceed.*" {
+        send "y\r"
+        exp_continue
+    }
+    # Login de usuário
     "login:" {
         send "root\r"
         exp_continue
@@ -122,15 +201,17 @@ expect {
         send "opnsense\r"
         exp_continue
     }
+    # Quando alcançar o menu do OPNsense
     "Enter an option:" {
         send "8\r"
     }
     timeout {
-        puts "\n[ERRO] Timeout aguardando a tela de login do OPNsense."
+        send_user "\n[ERRO] Timeout aguardando a resposta do OPNsense.\n"
         exit 1
     }
 }
 
+# Execução do gpart dentro do Shell FreeBSD (Option 8)
 expect "# "
 send "gpart recover vtbd0\r"
 
@@ -140,10 +221,12 @@ send "gpart resize -i 3 vtbd0\r"
 expect "# "
 send "growfs -y /dev/vtbd0p3\r"
 
+# Sai do Shell e volta para o menu
 expect "# "
 send "exit\r"
 
 expect "Enter an option:"
+# Desconecta do qm terminal (Ctrl+O)
 send "\x0f"
 expect eof
 EOF
