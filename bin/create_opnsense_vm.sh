@@ -9,14 +9,14 @@ set -euo pipefail
 # ------------------------------------------------------------------------------
 VM_ID="100"
 STORAGE="local-lvm"
-BRIDGE_WAN="vmbr0"
+BRIDGE_WAN="vnetsnat"
 BRIDGE_LAN="vmbr1"
 CPU_CORES="2"
 RAM_MB="2048"
-DISK_EXPAND="+8G"
+DISK_EXPAND="+200G"
 
-OPNSENSE_VER="24.1"
-MIRROR_URL="https://mirror.dns-net.de/opnsense/releases"
+OPNSENSE_VER="26.7"
+MIRROR_URL="https://pkg.opnsense.org/releases/"
 IMG_NAME="OPNsense-${OPNSENSE_VER}-nano-amd64.img"
 
 # ------------------------------------------------------------------------------
