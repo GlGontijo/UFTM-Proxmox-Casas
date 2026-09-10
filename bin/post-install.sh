@@ -12,15 +12,31 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 require_root
 
+PVE_VERSION="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
+IFS='.' read -r PVE_MAJOR PVE_MINOR _ <<<"$(echo "$PVE_VERSION")"
+
 PVE_SOURCES="/etc/apt/sources.list.d/pve-enterprise.sources"
 PVE_NOSUB="/etc/apt/sources.list.d/pve-no-subscription.sources"
 CEPH_SOURCES="/etc/apt/sources.list.d/ceph.sources"
 DEBIAN_SOURCES="/etc/apt/sources.list.d/debian.sources"
-TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
 if ((PVE_MINOR >= 2)); then
   CEPH_RELEASE="ceph-tentacle"
 else
   CEPH_RELEASE="ceph-squid"
+fi
+TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
+
+# __ Confere se a versão é suportada
+msg_ok "Versão Proxmox detectada: $PVE_VERSION"
+if [[ "$PVE_MAJOR" == "9" ]]; then
+  if ((PVE_MINOR < 0 || PVE_MINOR > 2)); then
+    msg_error "Somente Proxmox 9.0-9.2.x é atualmente suportada"
+    exit 105
+  fi
+  msg_ok "Versão do Proxmox é suportada. Seguindo com a instalação..."
+else
+  msg_error "Somente Proxmox 9.0-9.2.x é atualmente suportada"
+  exit 105
 fi
 
 # ── Detecta codename (trixie no PVE 9) ─────────────────────────
