@@ -61,13 +61,12 @@ msg_ok "Repositório no-subscription habilitado, enterprise/ceph desabilitados"
 # ── 3) Remove nag de assinatura na UI ───────────────────────────
 msg_info "Removendo aviso de assinatura na Web UI"
 JS_FILE="/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
-APT_HOOK="/etc/apt/apt.conf.d/no-nag-script"
 if [[ -f "$JS_FILE" ]] && ! grep -q "NoMoreNagging" "$JS_FILE"; then
   backup_if_exists "$JS_FILE"
-  sed -i.bak "s/res\[0\]\['status'\] !== 'Active'/false/g" "$JS_FILE" || true
+  sed -i.bak 's/res\[0\]\[.status.\] !== .Active./false/g' "$JS_FILE" || true
 fi
 cat >"$APT_HOOK" <<'EOF'
-DPkg::Post-Invoke { "dpkg -l proxmox-widget-toolkit >/dev/null 2>&1 && sed -i.bak \"s/res\\[0\\]\\['status'\\] !== 'Active'/false/g\" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js || true"; };
+DPkg::Post-Invoke { "dpkg -l proxmox-widget-toolkit >/dev/null 2>&1 && sed -i.bak 's/res\[0\]\[.status.\] !== .Active./false/g' /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js || true"; };
 EOF
 msg_ok "Nag removido (e reaplicação automática registrada em apt hook)"
 
