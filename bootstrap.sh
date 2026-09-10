@@ -23,14 +23,14 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-msg_info "Verificando dependências (git whiptail)"
-DEPS=(git whiptail)
+msg_info "Verificando dependências necessárias para o restante do fluxo"
+DEPS=(git whiptail wireguard-tools frr ppp pppoe jq curl ethtool bridge-utils tcpdump ipcalc chrony at expect)
 MISSING=()
 for d in "${DEPS[@]}"; do
   dpkg -s "$d" &>/dev/null || MISSING+=("$d")
 done
 if [[ "${#MISSING[@]}" -gt 0 ]]; then
-  apt-get install -y -qq "${MISSING[@]}"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${MISSING[@]}"
 fi
 msg_ok "Dependências ok"
 
