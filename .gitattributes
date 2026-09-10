@@ -1,0 +1,3 @@
+# Força o Git a usar sempre quebra de linha LF (Unix) para scripts e CSVs
+*.sh text eol=lf
+*.csv text eol=lf
