@@ -23,18 +23,6 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-msg_info "Verificando dependências (git, whiptail, wireguard-tools)"
-DEPS=(git whiptail wireguard-tools jq)
-MISSING=()
-for d in "${DEPS[@]}"; do
-  dpkg -s "$d" &>/dev/null || MISSING+=("$d")
-done
-if [[ "${#MISSING[@]}" -gt 0 ]]; then
-  apt-get update -qq
-  apt-get install -y -qq "${MISSING[@]}"
-fi
-msg_ok "Dependências ok"
-
 # Se já estamos dentro de um clone do repo (execução local), usa ele.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 if [[ -f "$SCRIPT_DIR/setup.sh" ]]; then
