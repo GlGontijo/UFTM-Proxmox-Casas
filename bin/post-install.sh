@@ -62,12 +62,6 @@ msg_ok "Repositório no-subscription habilitado, enterprise/ceph desabilitados"
 msg_info "Removendo aviso de assinatura na Web UI"
 JS_FILE="/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
 APT_HOOK="/etc/apt/apt.conf.d/no-nag-script"
-# Nota: usamos "." no lugar das aspas simples do JS-alvo (res[0]['status'])
-# de propósito -- string com aspas duplas escapadas (\") dentro de uma
-# string já entre aspas duplas NÃO é um escape válido nem em bash nem no
-# parser do apt.conf (vira \ + " literais), e quebra com "Extra junk after
-# value". Usando "." como wildcard de regex evita ter qualquer aspa dentro
-# da string inteira, em bash e no apt.conf.
 if [[ -f "$JS_FILE" ]] && ! grep -q "NoMoreNagging" "$JS_FILE"; then
   backup_if_exists "$JS_FILE"
   sed -i.bak 's/res\[0\]\[.status.\] !== .Active./false/g' "$JS_FILE" || true
