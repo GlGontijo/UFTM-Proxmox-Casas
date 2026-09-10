@@ -265,7 +265,8 @@ PYEOF
   fi
 
   # -- Syslog remoto ---------------------------------------------------
-  msg_info "Configurando encaminhamento de Syslog para pgdprotic.uftm.edu.br:1516/udp"
+  msg_info "Instalando e configurando encaminhamento de Syslog para pgdprotic.uftm.edu.br:1516/udp"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rsyslog rsyslog-doc rsyslog-snmp
   RSYSLOG_CONF="/etc/rsyslog.d/60-uftm-syslog.conf"
   backup_if_exists "$RSYSLOG_CONF"
   cat >"$RSYSLOG_CONF" <<'EOF'
