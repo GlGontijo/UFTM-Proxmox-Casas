@@ -133,6 +133,8 @@ if whiptail --yesno "O hostname deste host será definido como:\n\n  $UFTM_HOSTN
     fi
   done
   hostnamectl set-hostname "$UFTM_HOSTNAME_FINAL"
+  msg_info "Reiniciando serviços para o novo hostname"
+  systemctl restart networking.service pveproxy.service pvedaemon.service pve-firewall.service 2>/dev/null
   msg_ok "Hostname aplicado: $UFTM_HOSTNAME_FINAL"
 else
   msg_error "Cancelado pelo usuário"
