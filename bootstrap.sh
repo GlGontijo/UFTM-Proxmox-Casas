@@ -23,7 +23,6 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-
 msg_info "Verificando dependências (git whiptail)"
 DEPS=(git whiptail)
 MISSING=()
@@ -31,7 +30,6 @@ for d in "${DEPS[@]}"; do
   dpkg -s "$d" &>/dev/null || MISSING+=("$d")
 done
 if [[ "${#MISSING[@]}" -gt 0 ]]; then
-  apt-get update -qq 2>/dev/null
   apt-get install -y -qq "${MISSING[@]}"
 fi
 msg_ok "Dependências ok"
