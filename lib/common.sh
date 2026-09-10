@@ -55,13 +55,7 @@ csv_get_row() {
 # truncadas como a do bug do WG_Port ausente).
 csv_validate_columns() {
   local csv="$1" expected="$2"
-  awk -F';' -v expect="$expected" '
-    NR==1{next}
-    NF==0{next}
-    /^[[:space:]]*$/ {next}
-    NF!=exp{ printf "Linha %d tem %d campos (esperado %d): %s\n", NR, NF, expect, $0; bad=1 }
-    END{ exit bad ? 1 : 0 }
-  ' "$csv"
+  awk -F';' -v cols="$expected" 'NR==1{next} /^[ \t\r]*$/{next} NF!=cols{printf "Linha %d tem %d campos (esperado %d): %s\n", NR, NF, cols, $0; bad=1} END{if(bad==1) exit 1; else exit 0}' "$csv"
 }
 
 # is_valid_ipv4 <ip>
