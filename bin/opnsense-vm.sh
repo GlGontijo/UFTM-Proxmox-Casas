@@ -41,8 +41,8 @@ STORAGE=$(whiptail --inputbox "Storage para o disco da VM:" 0 60 "local-lvm" 3>&
 BRIDGE_WAN="vnetsnat"
 BRIDGE_LAN=$(whiptail --inputbox "Bridge para a LAN (trunk):" 0 60 "$UFTM_LAN_BRIDGE" 3>&2 2>&1 1>&3) || exit 1
 CPU_CORES=$(whiptail --inputbox "vCPUs:" 0 50 "2" 3>&2 2>&1 1>&3) || exit 1
-RAM_MB=$(whiptail --inputbox "RAM (MB):" 0 50 "2048" 3>&2 2>&1 1>&3) || exit 1
-DISK_EXPAND=$(whiptail --inputbox "Expandir disco para (ex: +200G):" 0 50 "+200G" 3>&2 2>&1 1>&3) || exit 1
+RAM_MB=$(whiptail --inputbox "RAM (MB):" 0 50 "4096" 3>&2 2>&1 1>&3) || exit 1
+DISK_EXPAND=$(whiptail --inputbox "Expandir disco para (ex: 200G):" 0 50 "200G" 3>&2 2>&1 1>&3) || exit 1
 OPNSENSE_VER=$(whiptail --inputbox "Versão do OPNsense:" 0 50 "26.7" 3>&2 2>&1 1>&3) || exit 1
 MIRROR_URL="https://pkg.opnsense.org/releases"
 IMG_NAME="OPNsense-${OPNSENSE_VER}-nano-amd64.img"
@@ -163,6 +163,7 @@ expect {
   -re "Do you want to configure VLANs now.*" { send "n\r"; exp_continue }
   -re "Enter the WAN interface name.*" { send "vtnet0\r"; exp_continue }
   -re "Enter the LAN interface name.*" { send "vtnet1\r"; exp_continue }
+  -re "Enter the Optional interface.*" { send "\r"; exp_continue }
   -re "Do you want to proceed.*" { send "y\r"; exp_continue }
   "login:" { send "root\r"; exp_continue }
   "Password:" { send "opnsense\r"; exp_continue }
