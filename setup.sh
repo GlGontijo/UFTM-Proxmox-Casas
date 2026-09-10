@@ -104,7 +104,7 @@ else
 fi
 
 prompt_sensitive_data
-UFTM_WG_ENDPOINT="${UFTM_IP_WAN:+${UFTM_IP_WAN}:${UFTM_WG_PORT}}"
+UFTM_WG_ENDPOINT="${UFTM_IP_WAN:${UFTM_WG_PORT}}"
 
 # ─────────────────────────────────────────────────────────────
 # NÚMERO DE PATRIMÔNIO -> compõe o hostname final (ex: pve-odonto-120699)
@@ -122,13 +122,17 @@ UFTM_HOSTNAME_FINAL="${UFTM_HOSTNAME}-${PATRIMONIO}"
 
 if whiptail --yesno "O hostname deste host será definido como:\n\n  $UFTM_HOSTNAME_FINAL\n\nConfirma?" 0 0; then
   msg_info "Aplicando hostname $UFTM_HOSTNAME_FINAL"
-  backup_if_exists /etc/hosts
+  OLD_HOSTNAME=$(hostname)
+  HOSTFILE=(/etc/hosts /etc/hostname /etc/mailname /etc/postfix/main.cf)
+  for f in "${HOSTFILE[@]}"; do
+    if grep -q "$OLD_HOSTNAME" "$f" 2>/dev/null; then
+      backup_if_exists "$f"
+      echo "Alterando arquivo $f"
+      echo sed -i "s/${OLD_HOSTNAME}/${UFTM_HOSTNAME_FINAL}/g" "$f"
+      sed -i "s/${OLD_HOSTNAME}/${UFTM_HOSTNAME_FINAL}/g" "$f"
+    fi
+  done
   hostnamectl set-hostname "$UFTM_HOSTNAME_FINAL"
-  if grep -q "^127\.0\.1\.1" /etc/hosts; then
-    sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t${UFTM_HOSTNAME_FINAL}/" /etc/hosts
-  else
-    echo -e "127.0.1.1\t${UFTM_HOSTNAME_FINAL}" >>/etc/hosts
-  fi
   msg_ok "Hostname aplicado: $UFTM_HOSTNAME_FINAL"
 else
   msg_error "Cancelado pelo usuário"
