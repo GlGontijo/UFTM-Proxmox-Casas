@@ -55,11 +55,11 @@ csv_get_row() {
 # truncadas como a do bug do WG_Port ausente).
 csv_validate_columns() {
   local csv="$1" expected="$2"
-  awk -F';' -v exp="$expected" '
+  awk -F';' -v expect="$expected" '
     NR==1{next}
     NF==0{next}
     /^[[:space:]]*$/ {next}
-    NF!=exp{ printf "Linha %d tem %d campos (esperado %d): %s\n", NR, NF, exp, $0; bad=1 }
+    NF!=exp{ printf "Linha %d tem %d campos (esperado %d): %s\n", NR, NF, expect, $0; bad=1 }
     END{ exit bad ? 1 : 0 }
   ' "$csv"
 }
