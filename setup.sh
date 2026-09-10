@@ -168,19 +168,6 @@ run_step() {
 }
 
 run_step "post-install"    "$BIN_DIR/post-install.sh"
-
-msg_info "Verificando dependências (libpve-network-perl frr frr-pythontools wireguard-tools jq)"
-DEPS=(libpve-network-perl frr frr-pythontools wireguard-tools jq)
-MISSING=()
-for d in "${DEPS[@]}"; do
-  dpkg -s "$d" &>/dev/null || MISSING+=("$d")
-done
-if [[ "${#MISSING[@]}" -gt 0 ]]; then
-  apt-get update -qq
-  apt-get install -y -qq "${MISSING[@]}"
-fi
-msg_ok "Dependências ok"
-
 run_step "network-install" "$BIN_DIR/network-install.sh"
 run_step "sdn-install"     "$BIN_DIR/sdn-install.sh"
 run_step "evpn-bind-vlan"  "$BIN_DIR/evpn-bind-vlan.sh"
