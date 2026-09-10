@@ -17,6 +17,11 @@ PVE_NOSUB="/etc/apt/sources.list.d/pve-no-subscription.sources"
 CEPH_SOURCES="/etc/apt/sources.list.d/ceph.sources"
 DEBIAN_SOURCES="/etc/apt/sources.list.d/debian.sources"
 TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
+if ((PVE_MINOR >= 2)); then
+  CEPH_RELEASE="ceph-tentacle"
+else
+  CEPH_RELEASE="ceph-squid"
+fi
 
 # ── Detecta codename (trixie no PVE 9) ─────────────────────────
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
@@ -71,12 +76,6 @@ Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 EOF
 msg_ok "Repositório no-subscription habilitado"
 
-local CEPH_RELEASE
-if ((PVE_MINOR >= 2)); then
-  CEPH_RELEASE="ceph-tentacle"
-else
-  CEPH_RELEASE="ceph-squid"
-fi
 msg_info "Adicionando 'repositório ceph' (deb822)"
 cat >"$CEPH_SOURCES" <<EOF
 Types: deb
