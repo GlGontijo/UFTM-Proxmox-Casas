@@ -3,4 +3,4 @@ pve-ceppa;51820;10.255.255.2;s;https://backups.uftm.edu.br/opnsense/ceppa/config
 pve-dass;51820;10.255.255.3;s;https://backups.uftm.edu.br/opnsense/dass/config.xml
 pve-diaes;51820;10.255.255.4;s;https://backups.uftm.edu.br/opnsense/diaes/config.xml
 pve-odonto;51820;10.255.255.10;s;https://backups.uftm.edu.br/opnsense/odonto/config.xml
-pve-testes-gontijo;51820;10.255.255.200;n;
+pve-testes-gontijo;51820;10.255.255.200;n;null
