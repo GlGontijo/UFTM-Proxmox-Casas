@@ -16,10 +16,11 @@ PVE_SOURCES="/etc/apt/sources.list.d/pve-enterprise.sources"
 PVE_NOSUB="/etc/apt/sources.list.d/pve-no-subscription.sources"
 CEPH_SOURCES="/etc/apt/sources.list.d/ceph.sources"
 DEBIAN_SOURCES="/etc/apt/sources.list.d/debian.sources"
+TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
 
 # ── Detecta codename (trixie no PVE 9) ─────────────────────────
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
-msg_ok "Codename detectado: $CODENAME"
+msg_ok "Versão Debian detectada: $CODENAME"
 
 # ── 1) Repositório Debian correto (main/updates/security) ─────
 msg_info "Configurando repositórios Debian ($CODENAME)"
@@ -27,7 +28,7 @@ backup_if_exists "$DEBIAN_SOURCES"
 cat >"$DEBIAN_SOURCES" <<EOF
 Types: deb
 URIs: http://deb.debian.org/debian
-Suites: $CODENAME $CODENAME-updates
+Suites: $CODENAME
 Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 
@@ -36,15 +37,31 @@ URIs: http://security.debian.org/debian-security
 Suites: $CODENAME-security
 Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: http://deb.debian.org/debian
+Suites: $CODENAME-updates
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 EOF
 msg_ok "Repositórios Debian configurados"
 
 # ── 2) Desabilita enterprise repo, habilita no-subscription ────
 msg_info "Ajustando repositórios Proxmox VE"
-if [[ -f "$PVE_SOURCES" ]]; then
-  backup_if_exists "$PVE_SOURCES"
-  sed -i 's/^Enabled: .*/Enabled: false/' "$PVE_SOURCES" 2>/dev/null || true
-fi
+for aptfile in /etc/apt/sources.list.d/*.sources; do
+  msg_info "Removendo repositórios '*-enterprise'..."
+  if grep -q "Components:.*pve-enterprise" "$aptfile"; then
+    backup_if_exists "$aptfile"
+    rm -f "$aptfile"
+    msg_ok "Repositório 'pve-enterprise' removido"
+  fi
+  if grep -q "enterprise.proxmox.com.*ceph" "$aptfile"; then
+    backup_if_exists "$aptfile"
+    rm -f "$aptfile"
+    msg_ok "Repositório 'ceph-enterprise' removido"
+  fi
+done
+
 cat >"$PVE_NOSUB" <<EOF
 Types: deb
 URIs: http://download.proxmox.com/debian/pve
@@ -52,11 +69,34 @@ Suites: $CODENAME
 Components: pve-no-subscription
 Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 EOF
-if [[ -f "$CEPH_SOURCES" ]]; then
-  backup_if_exists "$CEPH_SOURCES"
-  sed -i 's/^Enabled: .*/Enabled: false/' "$CEPH_SOURCES" 2>/dev/null || true
+msg_ok "Repositório no-subscription habilitado"
+
+local CEPH_RELEASE
+if ((PVE_MINOR >= 2)); then
+  CEPH_RELEASE="ceph-tentacle"
+else
+  CEPH_RELEASE="ceph-squid"
 fi
-msg_ok "Repositório no-subscription habilitado, enterprise/ceph desabilitados"
+msg_info "Adicionando 'repositório ceph' (deb822)"
+cat >"$CEPH_SOURCES" <<EOF
+Types: deb
+URIs: http://download.proxmox.com/debian/${CEPH_RELEASE}
+Suites: $CODNAME
+Components: no-subscription
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+EOF
+msg_ok "Added 'ceph package repositories' (${CEPH_RELEASE})"
+
+msg_info "Adding 'pve-test' repository (deb822, disabled)"
+cat >"$TEST_SOURCES" <<EOF
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: trixie
+Components: pve-test
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+Enabled: false
+EOF
+msg_ok "Added 'pve-test' repository"
 
 # ── 3) Remove nag de assinatura na UI ───────────────────────────
 msg_info "Removendo aviso de assinatura na Web UI"
