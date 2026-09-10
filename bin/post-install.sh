@@ -140,14 +140,7 @@ else
   msg_warn "Upgrade pulado a pedido do usuário"
 fi
 
-# ── 5) Pacotes úteis para o restante do fluxo ──────────────────
-msg_info "Instalando pacotes base (wireguard-tools, frr, ppp, rp-pppoe, jq, curl, ethtool, at)"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  wireguard-tools frr ppp pppoe jq curl ethtool bridge-utils tcpdump ipcalc chrony at
-systemctl enable --now atd 2>/dev/null || true
-msg_ok "Pacotes base instalados"
-
-# ── 6) Timezone e locale (não força, só avisa se diferente) ────
+# ── 5) Timezone e locale (não força, só avisa se diferente) ────
 CURRENT_TZ="$(timedatectl show -p Timezone --value 2>/dev/null || echo "?")"
 if [[ "$CURRENT_TZ" != "America/Sao_Paulo" ]]; then
   if whiptail --yesno "Timezone atual: $CURRENT_TZ. Ajustar para America/Sao_Paulo?" 0 0; then
@@ -156,7 +149,7 @@ if [[ "$CURRENT_TZ" != "America/Sao_Paulo" ]]; then
   fi
 fi
 
-# ── 7) high-availability / rrdcached em RAM (evita desgaste do disco) ──
+# ── 6) high-availability / rrdcached em RAM (evita desgaste do disco) ──
 msg_info "Ajustando rrdcached para reduzir I/O em disco"
 mkdir -p /etc/systemd/system/rrdcached.service.d
 cat >/etc/systemd/system/rrdcached.service.d/override.conf <<'EOF'
@@ -168,7 +161,7 @@ systemctl daemon-reload
 systemctl restart rrdcached 2>/dev/null || true
 msg_ok "rrdcached ajustado (flush a cada 300s)"
 
-# ── 8) SNMP (monitoramento DTI) + Syslog remoto para a UFTM ─────
+# ── 7) SNMP (monitoramento DTI) + Syslog remoto para a UFTM ─────
 # SNMPv2 (community "DTI", sem restrição de origem no daemon -- o controle
 # de quem alcança a porta fica por conta do firewall) e encaminhamento de
 # todo o log do host via syslog UDP para pgdprotic.uftm.edu.br:1516.
