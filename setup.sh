@@ -3,13 +3,22 @@
 # setup.sh
 # Orquestrador principal do UFTM-Proxmox-Casas.
 #
-# Fluxo:
-#   1) post-install.sh      - otimização base do Proxmox
-#   2) network-install.sh   - WAN (DHCP/Fixo/PPPoE) + LAN trunk
-#   3) sdn-install.sh       - fabric WireGuard + EVPN/VXLAN + vnets + SNAT
-#   4) evpn-bind-vlan.sh    - serviço de bind persistente das interfaces de trunk
-#   5) opnsense-vm.sh       - VM OPNsense (se solicitado no CSV/manual)
-#   6) reboot opcional
+# Fluxo (pensado pra instalação em laboratório, sem depender de internet
+# depois que a rede final é escrita):
+#   0) Desliga o pve-firewall (fica desligado o processo INTEIRO; só volta
+#      ligado no fim da etapa 8).
+#   1) post-install.sh        - parametriza repositórios e atualiza o sistema
+#   2) wizard.sh               - TODO o questionário do projeto, resumível
+#   3) download-deps.sh        - todo apt-get/download do projeto (com a
+#                                 internet do laboratório ainda de pé)
+#   4) network-install.sh      - grava a rede final (WAN/LAN/PPPoE/VLANs) --
+#                                 a internet do laboratório pode cair aqui
+#   5) hostname-and-restart.sh - aplica hostname, IP de gerência, restart
+#                                 de rede + serviços do Proxmox
+#   6) sdn-install.sh          - fabric WireGuard + EVPN + vnets + SNAT
+#   7) opnsense-vm.sh          - VM OPNsense (se solicitado no wizard)
+#   8) pve-firewall-config.sh  - SNMP + Syslog + regras + liga o firewall
+#   9) resumo final + reboot opcional
 #
 # Chamado normalmente pelo bootstrap.sh, mas pode ser executado direto:
 #   ./setup.sh [-c /caminho/hosts.csv]
@@ -19,8 +28,6 @@ shopt -s inherit_errexit
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 BIN_DIR="$SCRIPT_DIR/bin"
-CSV_FILE="$SCRIPT_DIR/data/hosts.csv"
-CSV_EXPECTED_COLS=5
 
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
@@ -29,142 +36,22 @@ require_root
 
 while getopts "c:" opt; do
   case "$opt" in
-  c) CSV_FILE="$OPTARG" ;;
+  c) export UFTM_CSV_FILE="$OPTARG" ;;
   *) echo "Uso: $0 [-c caminho/hosts.csv]"; exit 1 ;;
   esac
 done
 
-if [[ ! -f "$CSV_FILE" ]]; then
-  msg_error "Arquivo CSV não encontrado: $CSV_FILE"
-  echo "Copie data/hosts.csv.example para data/hosts.csv e preencha com os dados reais," >&2
-  echo "ou informe outro caminho com: $0 -c /caminho/hosts.csv" >&2
-  exit 1
-fi
-
-# Formato do CSV: Host;WG_Port;WG_TunnelIP;OPNsense;URL_BKPRepo
-# IP_WAN e a chave WireGuard NÃO ficam no CSV (repo público) -- são sempre
-# informados interativamente. URL_BKPRepo pode ficar vazio se OPNsense=n
-# ou se não houver backup a restaurar.
-if ! csv_validate_columns "$CSV_FILE" "$CSV_EXPECTED_COLS"; then
-  msg_error "hosts.csv com linha(s) malformada(s) (colunas != $CSV_EXPECTED_COLS). Corrija antes de continuar:"
-  csv_validate_columns "$CSV_FILE" "$CSV_EXPECTED_COLS" >&2 || true
-  exit 1
-fi
-
-select_host_from_csv() {
-  local menu_items=()
-  while IFS=';' read -r host _; do
-    [[ "$host" == "Host" || -z "$host" ]] && continue
-    menu_items+=("$host" "")
-  done <"$CSV_FILE"
-  menu_items+=("MANUAL" "Configuração avançada (informar manualmente)")
-
-  whiptail --backtitle "UFTM Proxmox Setup" --title "Selecione o Host" \
-    --menu "Escolha o host (dados vêm da planilha) ou configure manualmente:" 0 70 12 \
-    "${menu_items[@]}" 3>&2 2>&1 1>&3
-}
-
-prompt_sensitive_data() {
-  UFTM_IP_WAN=$(whiptail --inputbox "IP WAN deste site (deixe vazio se WAN=DHCP/PPPoE):" 0 70 3>&2 2>&1 1>&3) || exit 1
-
-  local WG_MODE
-  WG_MODE=$(whiptail --menu "Chave privada WireGuard:" 0 60 2 \
-    "informar" "Informar chave existente (padrão)" \
-    "gerar" "Gerar novo par com wg genkey" \
-    3>&2 2>&1 1>&3) || exit 1
-
-  if [[ "$WG_MODE" == "gerar" ]]; then
-    require_cmd wg
-    UFTM_WG_PK=$(wg genkey)
-    msg_ok "Chave privada gerada (guarde-a; não será exibida novamente)"
-  else
-    UFTM_WG_PK=$(whiptail --inputbox "Chave privada WireGuard (WG_PK):" 0 70 3>&2 2>&1 1>&3) || exit 1
-  fi
-}
-
-manual_input() {
-  UFTM_HOSTNAME=$(whiptail --inputbox "Hostname base (ex: pve-filial-x):" 0 70 3>&2 2>&1 1>&3) || exit 1
-  UFTM_WG_PORT=$(whiptail --inputbox "Porta WireGuard:" 0 70 "51820" 3>&2 2>&1 1>&3) || exit 1
-  UFTM_WG_TUNNEL_IP=$(whiptail --inputbox "IP do túnel WireGuard (ex: 10.255.255.X):" 0 70 3>&2 2>&1 1>&3) || exit 1
-  UFTM_OPNSENSE=$(whiptail --menu "Instalar VM OPNsense neste site?" 0 60 2 \
-    "s" "Sim" "n" "Não" 3>&2 2>&1 1>&3) || exit 1
-  UFTM_BKP_URL=""
-  if [[ "$UFTM_OPNSENSE" == "s" ]]; then
-    UFTM_BKP_URL=$(whiptail --inputbox "URL do config.xml de backup do OPNsense (vazio = instalação limpa):" 0 70 3>&2 2>&1 1>&3) || exit 1
-  fi
-}
-
-HOST_CHOICE=$(select_host_from_csv) || exit 1
-
-if [[ "$HOST_CHOICE" == "MANUAL" ]]; then
-  manual_input
-else
-  ROW=$(csv_get_row "$CSV_FILE" "$HOST_CHOICE") || { msg_error "Host '$HOST_CHOICE' não encontrado no CSV"; exit 1; }
-  IFS=';' read -r UFTM_HOSTNAME UFTM_WG_PORT UFTM_WG_TUNNEL_IP UFTM_OPNSENSE UFTM_BKP_URL <<<"$ROW"
-fi
-
-prompt_sensitive_data
-UFTM_WG_ENDPOINT="${UFTM_IP_WAN:${UFTM_WG_PORT}}"
-
-# ─────────────────────────────────────────────────────────────
-# NÚMERO DE PATRIMÔNIO -> compõe o hostname final (ex: pve-odonto-120699)
-# ─────────────────────────────────────────────────────────────
-PATRIMONIO=""
-while [[ -z "$PATRIMONIO" ]]; do
-  PATRIMONIO=$(whiptail --inputbox "Número de patrimônio do PC:" 0 60 3>&2 2>&1 1>&3) || exit 1
-  if [[ ! "$PATRIMONIO" =~ ^[0-9]+$ ]]; then
-    whiptail --msgbox "O número de patrimônio deve conter apenas dígitos. Tente novamente." 0 0
-    PATRIMONIO=""
-  fi
-done
-
-UFTM_HOSTNAME_FINAL="${UFTM_HOSTNAME}-${PATRIMONIO}"
-
-if whiptail --yesno "O hostname deste host será definido como:\n\n  $UFTM_HOSTNAME_FINAL\n\nConfirma?" 0 0; then
-  msg_info "Aplicando hostname $UFTM_HOSTNAME_FINAL"
-  OLD_HOSTNAME=$(hostname)
-  HOSTFILE=(/etc/hosts /etc/hostname /etc/mailname /etc/postfix/main.cf)
-  for f in "${HOSTFILE[@]}"; do
-    if grep -q "$OLD_HOSTNAME" "$f" 2>/dev/null; then
-      backup_if_exists "$f"
-      echo "Alterando arquivo $f"
-      echo sed -i "s/${OLD_HOSTNAME}/${UFTM_HOSTNAME_FINAL}/g" "$f"
-      sed -i "s/${OLD_HOSTNAME}/${UFTM_HOSTNAME_FINAL}/g" "$f"
-    fi
-  done
-  hostnamectl set-hostname "$UFTM_HOSTNAME_FINAL"
-  msg_info "Reiniciando serviços para o novo hostname"
-  systemctl restart networking.service pveproxy.service pvedaemon.service pve-firewall.service 2>/dev/null
-  msg_ok "Hostname aplicado: $UFTM_HOSTNAME_FINAL"
-else
-  msg_error "Cancelado pelo usuário"
-  exit 1
-fi
-
-UFTM_HOSTNAME="$UFTM_HOSTNAME_FINAL"
-
-SUMMARY="Host: $UFTM_HOSTNAME
-IP WAN: ${UFTM_IP_WAN:-<definido em network-install.sh>}
-WG Porta: $UFTM_WG_PORT
-WG Tunnel IP: $UFTM_WG_TUNNEL_IP
-OPNsense: $UFTM_OPNSENSE
-Backup OPNsense: ${UFTM_BKP_URL:-<nenhum>}
-
-Isso vai executar, nesta ordem:
-  1) post-install.sh     (otimização do Proxmox)
-  2) network-install.sh  (WAN + LAN trunk)
-  3) sdn-install.sh      (fabric WireGuard + EVPN + vnets + SNAT)
-  4) evpn-bind-vlan.sh   (serviço de bind persistente das VLANs)
-  5) opnsense-vm.sh      (se OPNsense = Sim)
-  6) reboot (opcional, ao final)
-
-Confirma?"
-whiptail --backtitle "UFTM Proxmox Setup" --title "Confirmação" --yesno "$SUMMARY" 0 0 || { msg_error "Cancelado pelo usuário"; exit 1; }
-
-export UFTM_HOSTNAME UFTM_IP_WAN UFTM_WG_ENDPOINT UFTM_WG_PK UFTM_WG_PORT UFTM_WG_TUNNEL_IP UFTM_OPNSENSE UFTM_BKP_URL
+# ── Etapa 0: firewall desligado durante TODO o processo ────────────
+# Só volta a ligar na etapa 8 (pve-firewall-config.sh), depois que todas as
+# regras (incluindo os IPs WAN da UFTM coletados no wizard) já estiverem
+# escritas de uma vez -- evita ficar aplicando regras parciais no meio do
+# processo e travar o próprio acesso ao host.
+msg_info "Desligando pve-firewall para todo o processo de instalação"
+pve-firewall stop 2>/dev/null || true
+msg_ok "pve-firewall desligado (só volta a ligar na etapa 8)"
 
 run_step() {
-  local name="$1" script="$2"
+  local script="$1"
   if [[ -x "$script" ]]; then
     "$script"
   else
@@ -173,26 +60,59 @@ run_step() {
   fi
 }
 
-run_step "post-install"    "$BIN_DIR/post-install.sh"
-run_step "network-install" "$BIN_DIR/network-install.sh"
-run_step "sdn-install"     "$BIN_DIR/sdn-install.sh"
-run_step "evpn-bind-vlan"  "$BIN_DIR/evpn-bind-vlan.sh"
+echo ""
+echo "════════════════════ ETAPA 1/9: post-install ════════════════════"
+run_step "$BIN_DIR/post-install.sh"
 
-if [[ "$UFTM_OPNSENSE" =~ ^[SsYy] ]]; then
-  run_step "opnsense-vm" "$BIN_DIR/opnsense-vm.sh"
+echo ""
+echo "════════════════════ ETAPA 2/9: wizard ═══════════════════════════"
+run_step "$BIN_DIR/wizard.sh"
+
+# A partir daqui, tudo já foi decidido -- carrega o estado gravado pelo wizard.
+state_load
+: "${UFTM_WIZARD_DONE:?O wizard não foi concluído -- rode de novo}"
+
+echo ""
+echo "════════════════════ ETAPA 3/9: download de dependências ════════"
+run_step "$BIN_DIR/download-deps.sh"
+
+echo ""
+echo "════════════════════ ETAPA 4/9: rede (WAN/LAN/VLANs) ═════════════"
+msg_warn "A partir daqui a internet deste laboratório pode cair de propósito."
+run_step "$BIN_DIR/network-install.sh"
+
+echo ""
+echo "════════════════════ ETAPA 5/9: hostname + restart ═══════════════"
+run_step "$BIN_DIR/hostname-and-restart.sh"
+
+echo ""
+echo "════════════════════ ETAPA 6/9: SDN (fabric/EVPN/vnets) ══════════"
+run_step "$BIN_DIR/sdn-install.sh"
+run_step "$BIN_DIR/evpn-bind-vlan.sh"
+
+echo ""
+echo "════════════════════ ETAPA 7/9: VM OPNsense ══════════════════════"
+if [[ "${UFTM_OPNSENSE:-n}" =~ ^[SsYy] ]]; then
+  run_step "$BIN_DIR/opnsense-vm.sh"
 else
   msg_ok "OPNsense não solicitado para este host"
 fi
 
-msg_ok "Setup concluído para $UFTM_HOSTNAME"
+echo ""
+echo "════════════════════ ETAPA 8/9: firewall ═════════════════════════"
+run_step "$BIN_DIR/pve-firewall-config.sh"
 
+echo ""
+echo "════════════════════ ETAPA 9/9: resumo final ═════════════════════"
+state_load
+msg_ok "Setup concluído para ${UFTM_HOSTNAME_FINAL:-$(hostname)}"
 if [[ -n "${UFTM_RUN_BACKUP_DIR:-}" ]]; then
   msg_ok "Backups desta execução em: $UFTM_RUN_BACKUP_DIR"
 fi
 
-if whiptail --yesno "Setup finalizado. Reiniciar o host agora para aplicar tudo de forma limpa?" 0 0; then
+if whiptail --yesno "Setup finalizado. Reiniciar o host agora para validar o boot completo (rede, SDN, VM, firewall)?" 0 0; then
   msg_info "Reiniciando"
   reboot
 else
-  msg_warn "Reboot adiado -- recomenda-se reiniciar manualmente para validar boot completo (PPPoE, fabric, vnets, VM)."
+  msg_warn "Reboot adiado -- recomenda-se reiniciar manualmente antes de instalar o PC no cliente final."
 fi
