@@ -98,8 +98,8 @@ else
   msg_warn "pvesh falhou ao registrar o nó hub -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
 fi
 
-msg_info "Registrando nó SPOKE ($NODE_ID), peer = hub ($HUB_HOSTNAME)"
 NODE_ID="${FABRIC_ID}_${UFTM_HOSTNAME}"
+msg_info "Registrando nó SPOKE ($NODE_ID), peer = hub ($HUB_HOSTNAME)"
 IFACE_STR="name=${WG_IFACE},listen_port=${UFTM_WG_PORT},public_key=${WG_PUBKEY},ip=${UFTM_WG_TUNNEL_IP}/24"
 PEER_STR="type=external,node=${HUB_HOSTNAME},iface=${WG_IFACE}"
 if pvesh_try create "$NODE_COLLECTION" \
