@@ -6,10 +6,10 @@
 RD=$(echo "\033[01;31m"); YW=$(echo "\033[33m"); GN=$(echo "\033[1;92m"); CL=$(echo "\033[m")
 BFR="\\r\\033[K"; HOLD="-"; CM="${GN}✓${CL}"; CROSS="${RD}✗${CL}"
 
-msg_info()  { echo -ne " ${HOLD} ${YW}$1..."; }
-msg_ok()    { echo -e "${BFR} ${CM} ${GN}$1${CL}"; }
-msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}"; }
-msg_warn()  { echo -e " ${YW}⚠ $1${CL}"; }
+msg_info()  { echo -ne " ${HOLD} ${YW}$1...\n"; }
+msg_ok()    { echo -e "${BFR} ${CM} ${GN}$1${CL}\n"; }
+msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}\n"; }
+msg_warn()  { echo -e " ${YW}⚠ $1${CL}\n"; }
 
 UFTM_ETC_DIR="/etc/uftm-proxmox-casas"
 UFTM_BACKUP_ROOT="/root/uftm-proxmox-casas-backups"
@@ -80,6 +80,7 @@ pause_ack() {
 # arquivo -- nenhuma delas pergunta nada ao usuário diretamente.
 
 state_load() {
+  msg_info "Verifica se o processo foi interrompido"
   [[ -f "$UFTM_STATE_FILE" ]] && source "$UFTM_STATE_FILE"
 }
 
