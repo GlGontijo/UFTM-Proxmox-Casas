@@ -66,7 +66,7 @@ if [[ "$VMID" > 0 ]]; then
   msg_info "Criando VM $VMID ($VM_NAME)"
   qm create "$VMID" \
     --name "$VM_NAME" \
-    --ostype l26 \
+    --ostype other \
     --machine q35 \
     --cores "$CPU_CORES" \
     --cpu host \
@@ -74,7 +74,6 @@ if [[ "$VMID" > 0 ]]; then
     --net0 "virtio,bridge=${BRIDGE_WAN}" \
     --net1 "virtio,bridge=${BRIDGE_LAN}" \
     --serial0 socket \
-    --vga serial0 \
     --onboot 1
   msg_ok "VM $VMID criada"
 
