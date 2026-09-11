@@ -14,9 +14,9 @@ REPO_DIR="/opt/uftm-proxmox-casas"
 BRANCH="main"
 
 RD=$(echo "\033[01;31m"); YW=$(echo "\033[33m"); GN=$(echo "\033[1;92m"); CL=$(echo "\033[m")
-msg_info()  { echo -ne " - ${YW}$1...${CL}"; }
-msg_ok()    { echo -e "\r \033[K ${GN}✓ $1${CL}"; }
-msg_error() { echo -e "\r \033[K ${RD}✗ $1${CL}"; }
+msg_info()  { echo -ne " - ${YW}$1...${CL}\n"; }
+msg_ok()    { echo -e "\r \033[K ${GN}✓ $1${CL}\n"; }
+msg_error() { echo -e "\r \033[K ${RD}✗ $1${CL}\n"; }
 
 if [[ "$(id -u)" -ne 0 ]]; then
   msg_error "Execute como root."
