@@ -59,7 +59,7 @@ while qm status "$VMID" &>/dev/null; do
   fi
 done
 
-if "$VMID" != 0; then
+if [[ "$VMID" > 0 ]]; then
   msg_ok "VM: $VM_NAME (ID $VMID) -- net0=$BRIDGE_WAN/WAN, net1=$BRIDGE_LAN/LAN-trunk, ${CPU_CORES}vCPU/${RAM_MB}MB/${DISK_SIZE}, OPNsense $OPNSENSE_VER"
 
   # ── 1) Criação da VM ──────────────────────────────────────────────
