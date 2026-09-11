@@ -92,7 +92,7 @@ ENDPOINT_STR="${HUB_ENDPOINT}:${UFTM_WG_PORT}"
 if pvesh_try create "$NODE_COLLECTION" \
     -node_id "$HUB_HOSTNAME" -protocol wireguard \
     -allowed-ips "${HUB_LOOPBACK_IP}/32" -endpoint ${ENDPOINT_STR} \
-    -public_key "$HUB_PUBKEY" -role external >/dev/null; then
+    -public_key "$HUB_PUBKEY" -role external ; then
   msg_ok "Nó hub registrado"
 else
   msg_warn "pvesh falhou ao registrar o nó hub -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
@@ -105,7 +105,7 @@ PEER_STR="type=external,node=${HUB_HOSTNAME},iface=${WG_IFACE}"
 if pvesh_try create "$NODE_COLLECTION" \
     -node_id "$NODE_ID" -allowed-ips "$FABRIC_ALLOWED_IPS" \
     -endpoint "${UFTM_IP_WAN:-auto}" -role internal \
-    -interfaces "$IFACE_STR" -peers "$PEER_STR" >/dev/null; then
+    -interfaces "$IFACE_STR" -peers "$PEER_STR" ; then
   msg_ok "Nó spoke registrado"
 else
   msg_warn "pvesh falhou ao registrar o nó spoke -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
