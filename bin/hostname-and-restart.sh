@@ -57,6 +57,7 @@ msg_ok "Hostname aplicado: $UFTM_HOSTNAME_FINAL (FQDN local: $FQDN)"
 
 # ── 4) Reinicia rede + serviços do Proxmox (equivalente a um reboot
 #      só pra estes efeitos, conforme a documentação do Proxmox) ────
+pvecm updatecerts -F
 msg_info "Reiniciando rede: systemctl restart networking.service"
 systemctl restart networking.service
 sleep 2
