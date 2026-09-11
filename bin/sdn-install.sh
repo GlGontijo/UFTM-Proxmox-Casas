@@ -27,7 +27,8 @@ require_root
 require_cmd pvesh wg jq
 state_load
 
-FABRIC_ID="WG-FAB"
+WG_IFACE="wg0"
+FABRIC_ID="WG-FAB" # Máximo 08 caracteres
 HUB_HOSTNAME="pve-vpnserver"
 HUB_ENDPOINT="pgdprotic.uftm.edu.br:51820"
 HUB_PUBKEY="Rln4PMSU5niFAJ8zGEawTQuibSjlXwffSERgIMe3QBY="
@@ -69,19 +70,13 @@ WG_PUBKEY="$(echo "$UFTM_WG_PK" | wg pubkey)"
 msg_ok "Chave pública derivada: $WG_PUBKEY"
 
 # ── 1) Fabric WireGuard ─────────────────────────────────────────
-# Confirmado via `pvesh usage /cluster/sdn/fabrics/fabric --command create
-# --verbose`: o endpoint de criação é /cluster/sdn/fabrics/fabric (não
-# /cluster/sdn/fabrics), os parâmetros são --id/--protocol/--ip_prefix, e
-# --persistent_keepalive só existe condicionalmente quando protocol=wireguard.
-# --id tem regex [a-zA-Z0-9][a-zA-Z0-9-]{0,6}[a-zA-Z0-9] -- MÁXIMO 8
-# CARACTERES. "WG-FAB" (6) cabe; não aumente o nome do fabric além disso.
 msg_info "Verificando fabric $FABRIC_ID"
 if pvesh_try get "/cluster/sdn/fabrics/fabric/$FABRIC_ID" >/dev/null; then
   msg_ok "Fabric $FABRIC_ID já existe"
 else
   if pvesh_try create /cluster/sdn/fabrics/fabric \
       -id "$FABRIC_ID" -protocol wireguard \
-      -ip_prefix "$FABRIC_ALLOWED_IPS" -persistent_keepalive 10 >/dev/null; then
+      -persistent_keepalive 10 >/dev/null; then
     msg_ok "Fabric $FABRIC_ID criado via pvesh"
   else
     msg_warn "pvesh falhou ao criar o fabric (log em /tmp/uftm-pvesh-err.log)."
@@ -89,46 +84,34 @@ else
   fi
 fi
 
-# ── 2) Nó do fabric: hub (external, referência) ou spoke (internal) ──
-# Confirmado via `pvesh ls /cluster/sdn/fabrics/node`: nós NÃO se criam em
-# /cluster/sdn/fabrics/node direto (isso não tem handler de create) -- cada
-# fabric tem sua própria coleção de nós em
-# /cluster/sdn/fabrics/node/<FABRIC_ID> (ex: /cluster/sdn/fabrics/node/WG-FAB),
-# e É ALI que se faz o create.
-#
-# ATENÇÃO -- os nomes de parâmetro abaixo (-node/-allowed-ips/-role/
-# -interfaces/-peers/-endpoint) ainda são um "melhor palpite" baseado no
-# formato do fabrics.cfg antigo, e NÃO foram confirmados contra
-# `pvesh usage /cluster/sdn/fabrics/node/WG-FAB --command create --verbose`.
-# Assim que esse comando rodar, ajusto esta seção para os nomes reais.
+# ── 2) Nó do fabric: hub (external, referência) / spoke (internal) ──
 NODE_COLLECTION="/cluster/sdn/fabrics/node/${FABRIC_ID}"
-NODE_ID="${FABRIC_ID}_${UFTM_HOSTNAME}"
 
-if [[ "$IS_HUB" == "s" ]]; then
-  msg_info "Registrando nó HUB ($NODE_ID)"
-  ENDPOINT_STR="${UFTM_IP_WAN:+${UFTM_IP_WAN}}:${UFTM_WG_PORT}"
-  IFACE_STR="name=wg0,listen_port=${UFTM_WG_PORT},public_key=${WG_PUBKEY},ip=${HUB_LOOPBACK_CIDR}"
-  if pvesh_try create "$NODE_COLLECTION" \
-      -node "$NODE_ID" -allowed-ips "$FABRIC_ALLOWED_IPS" \
-      -role external -interfaces "$IFACE_STR" >/dev/null; then
-    msg_ok "Nó hub registrado"
-  else
-    msg_warn "pvesh falhou ao registrar o nó hub -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
-  fi
+msg_info "Registrando nó HUB ($HUB_HOSTNAME)"
+ENDPOINT_STR="${HUB_ENDPOINT}:${UFTM_WG_PORT}"
+if pvesh_try create "$NODE_COLLECTION" \
+    -node_id "$HUB_HOSTNAME" -protocol wireguard \
+    -allowed-ips "$HUB_LOOPBACK_CIDR" -endpoint ${ENDPOINT_STR} \
+    -public_key "$HUB_PUBKEY" -role external >/dev/null; then
+  msg_ok "Nó hub registrado"
 else
-  msg_info "Registrando nó SPOKE ($NODE_ID), peer = hub ($HUB_HOSTNAME)"
-  IFACE_STR="name=wg0,listen_port=${UFTM_WG_PORT},public_key=${WG_PUBKEY},ip=${UFTM_WG_TUNNEL_IP}/24"
-  PEER_STR="type=external,node=${HUB_HOSTNAME},iface=wg0"
-  if pvesh_try create "$NODE_COLLECTION" \
-      -node "$NODE_ID" -allowed-ips "$FABRIC_ALLOWED_IPS" \
-      -endpoint "${UFTM_IP_WAN:-auto}" \
-      -role internal -interfaces "$IFACE_STR" -peers "$PEER_STR" >/dev/null; then
-    msg_ok "Nó spoke registrado"
-  else
-    msg_warn "pvesh falhou ao registrar o nó spoke -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
-    msg_warn "Confirme manualmente se o hub ($HUB_HOSTNAME) já tem a chave pública deste spoke autorizada."
-  fi
+  msg_warn "pvesh falhou ao registrar o nó hub -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
 fi
+
+msg_info "Registrando nó SPOKE ($NODE_ID), peer = hub ($HUB_HOSTNAME)"
+NODE_ID="${FABRIC_ID}_${UFTM_HOSTNAME}"
+IFACE_STR="name=${WG_IFACE},listen_port=${UFTM_WG_PORT},public_key=${WG_PUBKEY},ip=${UFTM_WG_TUNNEL_IP}/24"
+PEER_STR="type=external,node=${HUB_HOSTNAME},iface=${WG_IFACE}"
+if pvesh_try create "$NODE_COLLECTION" \
+    -node_id "$NODE_ID" -allowed-ips "$FABRIC_ALLOWED_IPS" \
+    -endpoint "${UFTM_IP_WAN:-auto}" -role internal \
+    -interfaces "$IFACE_STR" -peers "$PEER_STR" >/dev/null; then
+  msg_ok "Nó spoke registrado"
+else
+  msg_warn "pvesh falhou ao registrar o nó spoke -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
+  msg_warn "Confirme manualmente se o hub ($HUB_HOSTNAME) já tem a chave pública deste spoke autorizada."
+fi
+
 
 # A chave PRIVADA nunca é passada por linha de comando (fica em /proc/*/cmdline
 # visível a outros processos). O fabric aceita a chave via arquivo/stdin na UI;
