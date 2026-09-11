@@ -53,48 +53,48 @@ while qm status "$VMID" &>/dev/null; do
         \n'SIM': OPNsense será instalado.\n'NÃO': Criação da VM será abortada." 0 0 ; then
       VMID=$((VMID + 1))
     else
-      state_set UFTM_OPN_VMID "$VMID"
-      state_mark_step "opnsense-vm"
-      msg_ok "opnsense-vm.sh concluído (VM $VMID / $VM_NAME)"
+      masg_info "Instalação da VM cancelada pelo usuáŕio."
+      VMID=0
     fi
   fi
 done
 
-msg_ok "VM: $VM_NAME (ID $VMID) -- net0=$BRIDGE_WAN/WAN, net1=$BRIDGE_LAN/LAN-trunk, ${CPU_CORES}vCPU/${RAM_MB}MB/${DISK_SIZE}, OPNsense $OPNSENSE_VER"
+if "$VMID" != 0; then
+  msg_ok "VM: $VM_NAME (ID $VMID) -- net0=$BRIDGE_WAN/WAN, net1=$BRIDGE_LAN/LAN-trunk, ${CPU_CORES}vCPU/${RAM_MB}MB/${DISK_SIZE}, OPNsense $OPNSENSE_VER"
 
-# ── 1) Criação da VM ──────────────────────────────────────────────
-msg_info "Criando VM $VMID ($VM_NAME)"
-qm create "$VMID" \
-  --name "$VM_NAME" \
-  --ostype l26 \
-  --machine q35 \
-  --cores "$CPU_CORES" \
-  --cpu host \
-  --memory "$RAM_MB" \
-  --net0 "virtio,bridge=${BRIDGE_WAN}" \
-  --net1 "virtio,bridge=${BRIDGE_LAN}" \
-  --serial0 socket \
-  --vga serial0 \
-  --onboot 1
-msg_ok "VM $VMID criada"
+  # ── 1) Criação da VM ──────────────────────────────────────────────
+  msg_info "Criando VM $VMID ($VM_NAME)"
+  qm create "$VMID" \
+    --name "$VM_NAME" \
+    --ostype l26 \
+    --machine q35 \
+    --cores "$CPU_CORES" \
+    --cpu host \
+    --memory "$RAM_MB" \
+    --net0 "virtio,bridge=${BRIDGE_WAN}" \
+    --net1 "virtio,bridge=${BRIDGE_LAN}" \
+    --serial0 socket \
+    --vga serial0 \
+    --onboot 1
+  msg_ok "VM $VMID criada"
 
-# ── 2) Importação e expansão do disco (imagem já em cache) ───────
-msg_info "Importando e expandindo o disco a partir de $IMG_PATH"
-qm importdisk "$VMID" "$IMG_PATH" "$STORAGE"
-qm set "$VMID" --virtio0 "${STORAGE}:vm-${VMID}-disk-0"
-qm resize "$VMID" virtio0 "$DISK_SIZE"
-qm set "$VMID" --boot order=virtio0
-msg_ok "Disco importado e expandido para $DISK_SIZE"
+  # ── 2) Importação e expansão do disco (imagem já em cache) ───────
+  msg_info "Importando e expandindo o disco a partir de $IMG_PATH"
+  qm importdisk "$VMID" "$IMG_PATH" "$STORAGE"
+  qm set "$VMID" --virtio0 "${STORAGE}:vm-${VMID}-disk-0"
+  qm resize "$VMID" virtio0 "$DISK_SIZE"
+  qm set "$VMID" --boot order=virtio0
+  msg_ok "Disco importado e expandido para $DISK_SIZE"
 
-# ── 3) Boot inicial ────────────────────────────────────────────────
-msg_info "Ligando a VM para automação do primeiro boot"
-qm start "$VMID"
-msg_ok "VM iniciada -- aguardando ~40s o boot do FreeBSD"
-sleep 40
+  # ── 3) Boot inicial ────────────────────────────────────────────────
+  msg_info "Ligando a VM para automação do primeiro boot"
+  qm start "$VMID"
+  msg_ok "VM iniciada -- aguardando ~40s o boot do FreeBSD"
+  sleep 40
 
-# ── 4) Automação via expect: wizard inicial + gpart/growfs ───────
-msg_info "Executando automação do console serial (wizard + expansão do FS)"
-expect <<EOF
+  # ── 4) Automação via expect: wizard inicial + gpart/growfs ───────
+  msg_info "Executando automação do console serial (wizard + expansão do FS)"
+  expect <<EOF
 set timeout 60
 spawn qm terminal ${VMID}
 send "\r"
@@ -127,18 +127,18 @@ expect "Enter an option:"
 send "\x0f"
 expect eof
 EOF
-msg_ok "Wizard inicial concluído e filesystem expandido (vtnet0=WAN, vtnet1=LAN)"
+  msg_ok "Wizard inicial concluído e filesystem expandido (vtnet0=WAN, vtnet1=LAN)"
 
-# ── 5) Restauração de config.xml (se veio em cache de download-deps.sh) ──
-# O arquivo já foi baixado/escolhido/renomeado para config.xml na etapa 3.
-# Aqui só aplicamos o MSS clamping (1320) nas interfaces com MTU 1360 e
-# entregamos via HTTP efêmero na bridge de SNAT para a VM buscar com
-# `fetch` de dentro do próprio OPNsense (evita montar UFS pelo lado Linux).
-CONFIG_URL=""
-if [[ -n "${UFTM_OPN_CONFIG_XML_PATH:-}" && -f "$UFTM_OPN_CONFIG_XML_PATH" ]]; then
-  CONFIG_LOCAL="$UFTM_OPN_CONFIG_XML_PATH"
-  msg_info "Garantindo MSS clamping (1320) nas interfaces com MTU 1360"
-  python3 - "$CONFIG_LOCAL" <<'PYEOF'
+  # ── 5) Restauração de config.xml (se veio em cache de download-deps.sh) ──
+  # O arquivo já foi baixado/escolhido/renomeado para config.xml na etapa 3.
+  # Aqui só aplicamos o MSS clamping (1320) nas interfaces com MTU 1360 e
+  # entregamos via HTTP efêmero na bridge de SNAT para a VM buscar com
+  # `fetch` de dentro do próprio OPNsense (evita montar UFS pelo lado Linux).
+  CONFIG_URL=""
+  if [[ -n "${UFTM_OPN_CONFIG_XML_PATH:-}" && -f "$UFTM_OPN_CONFIG_XML_PATH" ]]; then
+    CONFIG_LOCAL="$UFTM_OPN_CONFIG_XML_PATH"
+    msg_info "Garantindo MSS clamping (1320) nas interfaces com MTU 1360"
+    python3 - "$CONFIG_LOCAL" <<'PYEOF'
 import sys, xml.etree.ElementTree as ET
 
 path = sys.argv[1]
@@ -183,20 +183,20 @@ if changed:
 else:
     print("  (nada a fazer -- regras já presentes ou nenhuma interface com MTU 1360)")
 PYEOF
-  msg_ok "config.xml verificado/ajustado"
+    msg_ok "config.xml verificado/ajustado"
 
-  SERVE_DIR=$(mktemp -d)
-  cp "$CONFIG_LOCAL" "$SERVE_DIR/config.xml"
-  SERVE_PORT=8879
-  ( cd "$SERVE_DIR" && python3 -m http.server "$SERVE_PORT" --bind 172.31.0.1 &>/tmp/uftm-opnsense-httpserve.log & echo $! >/tmp/uftm-opnsense-httpserve.pid )
-  sleep 1
-  CONFIG_URL="http://172.31.0.1:${SERVE_PORT}/config.xml"
-  msg_ok "Servindo config.xml (já ajustado) temporariamente em $CONFIG_URL"
-fi
+    SERVE_DIR=$(mktemp -d)
+    cp "$CONFIG_LOCAL" "$SERVE_DIR/config.xml"
+    SERVE_PORT=8879
+    ( cd "$SERVE_DIR" && python3 -m http.server "$SERVE_PORT" --bind 172.31.0.1 &>/tmp/uftm-opnsense-httpserve.log & echo $! >/tmp/uftm-opnsense-httpserve.pid )
+    sleep 1
+    CONFIG_URL="http://172.31.0.1:${SERVE_PORT}/config.xml"
+    msg_ok "Servindo config.xml (já ajustado) temporariamente em $CONFIG_URL"
+  fi
 
-if [[ -n "$CONFIG_URL" ]]; then
-  msg_info "Restaurando config.xml via console serial (fetch + reboot)"
-  expect <<EOF
+  if [[ -n "$CONFIG_URL" ]]; then
+    msg_info "Restaurando config.xml via console serial (fetch + reboot)"
+    expect <<EOF
 set timeout 60
 spawn qm terminal ${VMID}
 send "\r"
@@ -214,16 +214,17 @@ expect "done"
 send "/etc/rc.reboot\r"
 expect eof
 EOF
-  if [[ -f /tmp/uftm-opnsense-httpserve.pid ]]; then
-    kill "$(cat /tmp/uftm-opnsense-httpserve.pid)" 2>/dev/null || true
-    rm -f /tmp/uftm-opnsense-httpserve.pid
+    if [[ -f /tmp/uftm-opnsense-httpserve.pid ]]; then
+      kill "$(cat /tmp/uftm-opnsense-httpserve.pid)" 2>/dev/null || true
+      rm -f /tmp/uftm-opnsense-httpserve.pid
+    fi
+    msg_ok "config.xml restaurado e VM reiniciada para aplicar"
+    msg_warn "Confira pelo console (qm terminal $VMID) se o boot voltou normalmente."
+  else
+    msg_ok "Instalação limpa (sem restauração de config.xml) -- WAN/LAN ficam com DHCP padrão do wizard, ajuste depois pela GUI."
   fi
-  msg_ok "config.xml restaurado e VM reiniciada para aplicar"
-  msg_warn "Confira pelo console (qm terminal $VMID) se o boot voltou normalmente."
-else
-  msg_ok "Instalação limpa (sem restauração de config.xml) -- WAN/LAN ficam com DHCP padrão do wizard, ajuste depois pela GUI."
-fi
 
-state_set UFTM_OPN_VMID "$VMID"
-state_mark_step "opnsense-vm"
-msg_ok "opnsense-vm.sh concluído (VM $VMID / $VM_NAME)"
+  state_set UFTM_OPN_VMID "$VMID"
+  state_mark_step "opnsense-vm"
+  msg_ok "opnsense-vm.sh concluído (VM $VMID / $VM_NAME)"
+fi
