@@ -23,7 +23,9 @@ require_cmd whiptail
 CSV_FILE="${UFTM_CSV_FILE:-$SCRIPT_DIR/data/hosts.csv}"
 CSV_EXPECTED_COLS=5
 
-state_load
+if [[ -f "$UFTM_STATE_FILE" ]]; then
+  state_load
+fi
 
 # ── Retomar? ──────────────────────────────────────────────────────
 if [[ -f "$UFTM_STATE_FILE" ]] && [[ "${UFTM_WIZARD_DONE:-0}" != "1" ]] && [[ -n "${UFTM_HOSTNAME:-}" ]]; then
