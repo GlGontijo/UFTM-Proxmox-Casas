@@ -113,7 +113,7 @@ if [[ "${UFTM_OPNSENSE:-n}" =~ ^[SsYy] ]]; then
     fi
 
     echo "Baixando ${IMG_NAME}.bz2 ..."
-    wget -c --progress=bar:force -O "${IMG_PATH}.bz2" "${MIRROR_URL}/${OPN_VER}/${IMG_NAME}.bz2" 2>&1 | tail -n 20 || true
+    wget -c -q --show-progress -O "${IMG_PATH}.bz2" "${MIRROR_URL}/${OPN_VER}/${IMG_NAME}.bz2" || true
     ATTEMPT=$((ATTEMPT + 1))
   done
 
