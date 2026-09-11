@@ -23,6 +23,7 @@ require_cmd whiptail
 CSV_FILE="${UFTM_CSV_FILE:-$SCRIPT_DIR/data/hosts.csv}"
 CSV_EXPECTED_COLS=5
 
+msg_info "Verifica se o processo foi interrompido"
 state_load
 
 # ── Retomar? ──────────────────────────────────────────────────────
@@ -37,6 +38,8 @@ elif [[ -f "$UFTM_STATE_FILE" ]] && [[ "${UFTM_WIZARD_DONE:-0}" == "1" ]]; then
   if whiptail --yesno "Já existe uma configuração completa para '$UFTM_HOSTNAME' neste host.\n\nRefazer o wizard do zero? (Não = manter e pular direto pro resumo)" 0 0; then
     rm -f "$UFTM_STATE_FILE"
   fi
+else 
+  msg_ok "Primeira vez por aqui? Vamos seguir do zero então."
 fi
 
 # ═══════════════════════════════════════════════════════════════
