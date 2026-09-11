@@ -30,9 +30,9 @@ state_load
 WG_IFACE="wg0"
 FABRIC_ID="WG-FAB" # Máximo 08 caracteres
 HUB_HOSTNAME="pve-vpnserver"
-HUB_ENDPOINT="pgdprotic.uftm.edu.br:51820"
+HUB_ENDPOINT="pgdprotic.uftm.edu.br"
 HUB_PUBKEY="Rln4PMSU5niFAJ8zGEawTQuibSjlXwffSERgIMe3QBY="
-HUB_LOOPBACK_IP="10.255.255.1/32"
+HUB_LOOPBACK_IP="10.255.255.1"
 FABRIC_ALLOWED_IPS="10.255.255.0/24"
 EVPN_ASN=65000
 EVPN_CONTROLLER="evpnctl"
@@ -99,11 +99,11 @@ else
 fi
 
 NODE_ID="${FABRIC_ID}_${UFTM_HOSTNAME}"
-msg_info "Registrando nó SPOKE ($NODE_ID), peer = hub ($HUB_HOSTNAME)"
+msg_info "Registrando nó SPOKE ($UFTM_HOSTNAME), peer = hub ($HUB_HOSTNAME)"
 IFACE_STR="name=${WG_IFACE},listen_port=${UFTM_WG_PORT},public_key=${WG_PUBKEY},ip=${UFTM_WG_TUNNEL_IP}/24"
 PEER_STR="type=external,node=${HUB_HOSTNAME},iface=${WG_IFACE}"
 if pvesh_try create "$NODE_COLLECTION" \
-    -node_id "$NODE_ID" -allowed-ips "$FABRIC_ALLOWED_IPS" \
+    -node_id "$UFTM_HOSTNAME" -allowed-ips "$FABRIC_ALLOWED_IPS" \
     -endpoint "${UFTM_IP_WAN:-auto}" -role internal \
     -interfaces "$IFACE_STR" -peers "$PEER_STR" ; then
   msg_ok "Nó spoke registrado"
@@ -118,7 +118,7 @@ fi
 # via pvesh, gravamos apenas se houver um parâmetro de arquivo suportado --
 # caso a versão da API exija a private_key inline, isso é feito manualmente
 # na GUI (Datacenter > SDN > Fabrics) por enquanto, e sinalizado aqui:
-msg_warn "Se a API não aceitar private_key via arquivo nesta versão do PVE, informe-a manualmente em Datacenter > SDN > Fabrics > $NODE_ID (não fica em nenhum arquivo do repo)."
+msg_warn "Se a API não aceitar private_key via arquivo nesta versão do PVE, informe-a manualmente em Datacenter > SDN > Fabrics > $FABRIC_ID (não fica em nenhum arquivo do repo)."
 
 # ── 3) Controller EVPN ──────────────────────────────────────────
 msg_info "Verificando controller EVPN $EVPN_CONTROLLER"
