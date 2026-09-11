@@ -23,7 +23,6 @@ require_cmd whiptail
 CSV_FILE="${UFTM_CSV_FILE:-$SCRIPT_DIR/data/hosts.csv}"
 CSV_EXPECTED_COLS=5
 
-msg_info "Verifica se o processo foi interrompido"
 state_load
 
 # ── Retomar? ──────────────────────────────────────────────────────
