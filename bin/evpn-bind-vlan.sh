@@ -23,12 +23,10 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 require_root
 require_cmd ip bridge
+state_load
 
-[[ -f "$UFTM_ETC_DIR/network.env" ]] && source "$UFTM_ETC_DIR/network.env"
-[[ -f "$UFTM_ETC_DIR/vlans.env" ]] && source "$UFTM_ETC_DIR/vlans.env"
-
-: "${UFTM_LAN_BRIDGE:?UFTM_LAN_BRIDGE não definido -- rode network-install.sh antes}"
-: "${UFTM_SELECTED_VLANS:?UFTM_SELECTED_VLANS não definido -- rode sdn-install.sh antes}"
+: "${UFTM_LAN_BRIDGE:?Rode bin/wizard.sh + network-install.sh antes}"
+: "${UFTM_SELECTED_VLANS:?Rode bin/wizard.sh antes}"
 
 BIND_CONF="$UFTM_ETC_DIR/vlan-binds.conf"
 BIND_SCRIPT="/usr/local/bin/uftm-evpn-bind-vlan.sh"
@@ -138,3 +136,4 @@ msg_ok "Serviço uftm-evpn-bind-vlan habilitado e iniciado"
 systemctl --no-pager --full status uftm-evpn-bind-vlan.service | head -n 8 || true
 
 msg_ok "evpn-bind-vlan.sh concluído"
+state_mark_step "evpn-bind-vlan"
