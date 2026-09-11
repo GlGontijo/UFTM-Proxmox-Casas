@@ -54,5 +54,5 @@ else
   msg_ok "Repo clonado"
 fi
 
-chmod +x "$REPO_DIR"/setup.sh "$REPO_DIR"/bin/*.sh
+chmod +x "$REPO_DIR"/.sh "$REPO_DIR"/bin/*.sh "$REPO_DIR"/lib/*.sh
 exec "$REPO_DIR/setup.sh" "$@"
