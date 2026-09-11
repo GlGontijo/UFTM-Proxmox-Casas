@@ -49,7 +49,14 @@ while qm status "$VMID" &>/dev/null; do
     msg_ok "VM $VMID removida"
     break
   else
-    VMID=$((VMID + 1))
+    if whiptail --yesno "Deseja instalar uma nova VM com ID $((VMID + 1))?\n \
+        \n'SIM': OPNsense será instalado.\n'NÃO': Criação da VM será abortada." 0 0 ; then
+      VMID=$((VMID + 1))
+    else
+      state_set UFTM_OPN_VMID "$VMID"
+      state_mark_step "opnsense-vm"
+      msg_ok "opnsense-vm.sh concluído (VM $VMID / $VM_NAME)"
+    fi
   fi
 done
 
