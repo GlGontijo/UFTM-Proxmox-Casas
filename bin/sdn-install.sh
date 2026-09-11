@@ -32,7 +32,7 @@ FABRIC_ID="WG-FAB" # Máximo 08 caracteres
 HUB_HOSTNAME="pve-vpnserver"
 HUB_ENDPOINT="pgdprotic.uftm.edu.br:51820"
 HUB_PUBKEY="Rln4PMSU5niFAJ8zGEawTQuibSjlXwffSERgIMe3QBY="
-HUB_LOOPBACK_CIDR="10.255.255.1/32"
+HUB_LOOPBACK_IP="10.255.255.1/32"
 FABRIC_ALLOWED_IPS="10.255.255.0/24"
 EVPN_ASN=65000
 EVPN_CONTROLLER="evpnctl"
@@ -91,7 +91,7 @@ msg_info "Registrando nó HUB ($HUB_HOSTNAME)"
 ENDPOINT_STR="${HUB_ENDPOINT}:${UFTM_WG_PORT}"
 if pvesh_try create "$NODE_COLLECTION" \
     -node_id "$HUB_HOSTNAME" -protocol wireguard \
-    -allowed-ips "$HUB_LOOPBACK_CIDR" -endpoint ${ENDPOINT_STR} \
+    -allowed-ips "${HUB_LOOPBACK_IP}/32" -endpoint ${ENDPOINT_STR} \
     -public_key "$HUB_PUBKEY" -role external >/dev/null; then
   msg_ok "Nó hub registrado"
 else
@@ -126,7 +126,7 @@ if pvesh_try get "/cluster/sdn/controllers/$EVPN_CONTROLLER" >/dev/null; then
   msg_ok "Controller $EVPN_CONTROLLER já existe -- adicionando este nó aos peers se necessário"
   CUR_PEERS=$(pvesh get "/cluster/sdn/controllers/$EVPN_CONTROLLER" --output-format json 2>/dev/null | jq -r '.peers // ""')
   if [[ "$CUR_PEERS" != *"$UFTM_WG_TUNNEL_IP"* ]]; then
-    NEW_PEERS="${CUR_PEERS:+${CUR_PEERS},}${UFTM_WG_TUNNEL_IP}"
+    NEW_PEERS="${CUR_PEERS:+${CUR_PEERS},} ${UFTM_WG_TUNNEL_IP}"
     pvesh_try set "/cluster/sdn/controllers/$EVPN_CONTROLLER" -peers "$NEW_PEERS" >/dev/null \
       && msg_ok "Peer $UFTM_WG_TUNNEL_IP adicionado ao controller" \
       || msg_warn "Falha ao atualizar peers do controller -- adicione manualmente: $NEW_PEERS"
@@ -134,7 +134,7 @@ if pvesh_try get "/cluster/sdn/controllers/$EVPN_CONTROLLER" >/dev/null; then
 else
   if pvesh_try create /cluster/sdn/controllers \
       -controller "$EVPN_CONTROLLER" -type evpn -asn "$EVPN_ASN" \
-      -peers "$UFTM_WG_TUNNEL_IP" >/dev/null; then
+      -peers "${HUB_LOOPBACK_IP}, ${UFTM_WG_TUNNEL_IP}" >/dev/null; then
     msg_ok "Controller $EVPN_CONTROLLER criado"
   else
     msg_warn "Falha ao criar controller -- verifique /tmp/uftm-pvesh-err.log"
