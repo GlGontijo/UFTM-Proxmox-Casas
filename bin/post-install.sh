@@ -27,7 +27,7 @@ fi
 TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
 
 # __ Confere se a versão é suportada
-msg_ok "Versão Proxmox detectada: $PVE_VERSION"
+msg_info "Versão Proxmox detectada: $PVE_VERSION"
 if [[ "$PVE_MAJOR" == "9" ]]; then
   if ((PVE_MINOR < 0 || PVE_MINOR > 2)); then
     msg_error "Somente Proxmox 9.0-9.2.x é atualmente suportada"
@@ -41,7 +41,7 @@ fi
 
 # ── Detecta codename (trixie no PVE 9) ─────────────────────────
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
-msg_ok "Versão Debian detectada: $CODENAME"
+msg_info "Nome de versão Debian detectada: $CODENAME"
 
 # ── 1) Repositório Debian correto (main/updates/security) ─────
 msg_info "Configurando repositórios Debian ($CODENAME)"
@@ -71,12 +71,12 @@ msg_ok "Repositórios Debian configurados"
 msg_info "Ajustando repositórios Proxmox VE"
 for aptfile in /etc/apt/sources.list.d/*.sources; do
   msg_info "Removendo repositórios '*-enterprise'..."
-  if grep -q "Components:.*pve-enterprise" "$aptfile"; then
+  if grep -q "Components:.*pve-enterprise" "$aptfile" 2>/dev/null; then
     backup_if_exists "$aptfile"
     rm -f "$aptfile"
     msg_ok "Repositório 'pve-enterprise' removido"
   fi
-  if grep -q "enterprise.proxmox.com.*ceph" "$aptfile"; then
+  if grep -q "enterprise.proxmox.com.*ceph" "$aptfile" 2>/dev/null; then
     backup_if_exists "$aptfile"
     rm -f "$aptfile"
     msg_ok "Repositório 'ceph-enterprise' removido"
