@@ -57,11 +57,12 @@ msg_ok "Hostname aplicado: $UFTM_HOSTNAME_FINAL (FQDN local: $FQDN)"
 
 # ── 4) Reinicia rede + serviços do Proxmox (equivalente a um reboot
 #      só pra estes efeitos, conforme a documentação do Proxmox) ────
-msg_info "Reiniciando rede e serviços do Proxmox para o novo hostname"
+msg_info "Reiniciando rede"
 systemctl restart networking.service
 sleep 2
-systemctl restart pvedaemon.service pveproxy.service pve-cluster.service pve-firewall.service 2>/dev/null || true
-msg_ok "Serviços reiniciados"
+msg_info "Reiniciando serviços do Proxmox"
+systemctl restart pvedaemon.service pveproxy.service pve-cluster.service pve-firewall.service || true
+msg_ok "Serviços reiniciados para o novo hostname"
 
 state_mark_step "hostname-and-restart"
 msg_ok "hostname-and-restart.sh concluído"
