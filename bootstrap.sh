@@ -31,7 +31,7 @@ PVE_VERSION="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
 IFS='.' read -r PVE_MAJOR PVE_MINOR _ <<<"$(echo "$PVE_VERSION")"
 
 PVE_SOURCES="/etc/apt/sources.list.d/pve-enterprise.sources"
-PVE_NOSUB="/etc/apt/sources.list.d/pve-no-subscription.sources"
+PVE_NOSUB="/etc/apt/sources.list.d/proxmox.sources"
 CEPH_SOURCES="/etc/apt/sources.list.d/ceph.sources"
 DEBIAN_SOURCES="/etc/apt/sources.list.d/debian.sources"
 if ((PVE_MINOR >= 2)); then
