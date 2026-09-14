@@ -49,19 +49,25 @@ SNAT_GATEWAY="172.31.0.1"
 : "${UFTM_WG_TUNNEL_IP:?Rode bin/wizard.sh primeiro (etapa 2)}"
 : "${UFTM_SELECTED_VLANS:?Rode bin/wizard.sh primeiro (etapa 2)}"
 
+LOG_DIR="$SCRIPT_DIR/var/log"
+mkdir -p "$LOG_DIR"
+PVESH_LOG="$LOG_DIR/pvesh.log"
+
 pvesh_try() {
   # pvesh_try <method> <path> [args...] -- retorna 0/1, nunca aborta o script
   local method="$1" path="$2"; shift 2
-  pvesh "$method" "$path" "$@" 2>/tmp/uftm-pvesh-err.log
+  printf '\n[%s] pvesh %s %s %s\n' "$(date '+%F %T')" "$method" "$path" "$*" >> "$PVESH_LOG"
+  pvesh "$method" "$path" "$@" 2>>"$PVESH_LOG"
 }
 
 api_apply() {
   msg_info "Aplicando alterações do SDN (pvesh set /cluster/sdn)"
-  if pvesh set /cluster/sdn >/tmp/uftm-pvesh-apply.log 2>&1; then
+  printf '\n[%s] pvesh set /cluster/sdn\n' "$(date '+%F %T')" >> "$PVESH_LOG"
+  if pvesh set /cluster/sdn >>"$PVESH_LOG" 2>&1; then
     msg_ok "SDN aplicado"
   else
-    msg_error "Falha ao aplicar SDN -- veja /tmp/uftm-pvesh-apply.log"
-    cat /tmp/uftm-pvesh-apply.log >&2
+    msg_error "Falha ao aplicar SDN -- veja $PVESH_LOG"
+    tail -n 40 "$PVESH_LOG" >&2
   fi
 }
 
