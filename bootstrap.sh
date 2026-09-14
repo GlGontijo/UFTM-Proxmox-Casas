@@ -163,7 +163,7 @@ fi
 msg_ok "Dependências ok"
 
 # ── 8) Se já estamos dentro de um clone do repo (execução local), usa ele.
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-}")" &>/dev/null && pwd)"
 if [[ -f "$SCRIPT_DIR/setup.sh" ]]; then
   msg_ok "Executando a partir do clone local em $SCRIPT_DIR"
   exec "$SCRIPT_DIR/setup.sh" "$@"
