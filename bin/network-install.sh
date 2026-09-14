@@ -73,7 +73,7 @@ iface $UFTM_WAN_NIC inet manual
 
 auto $UFTM_WAN_BRIDGE
 iface $UFTM_WAN_BRIDGE inet static
-    address $UFTM_WAN_IP
+    address $UFTM_WAN_CIDR
     gateway $UFTM_WAN_GW
     bridge-ports $UFTM_WAN_NIC
     bridge-stp off
