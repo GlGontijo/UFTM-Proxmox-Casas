@@ -108,7 +108,7 @@ msg_info "Registrando nó SPOKE ($UFTM_HOSTNAME_FINAL), peer = hub ($HUB_HOSTNAM
 IFACE_STR="name=${WG_IFACE},listen_port=${UFTM_WG_PORT},public_key=${WG_PUBKEY},ip=${UFTM_WG_TUNNEL_IP}/24"
 PEER_STR="type=external,node=${HUB_HOSTNAME},iface=${WG_IFACE}"
 if pvesh_try create "$NODE_COLLECTION" \
-    -node_id "$UFTM_HOSTNAME_FINAL" -allowed_ips "$FABRIC_ALLOWED_IPS" \
+    -node_id "$UFTM_HOSTNAME_FINAL" -protocol wireguard -allowed_ips "$FABRIC_ALLOWED_IPS" \
     -endpoint "${UFTM_WAN_IP:-auto}" -role internal \
     -interfaces "$IFACE_STR" -peers "$PEER_STR" ; then
   msg_ok "Nó spoke registrado"
