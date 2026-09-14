@@ -66,6 +66,8 @@ for pvesvc in pvedaemon.service pveproxy.service pve-cluster.service pve-firewal
   msg_info "systemctl restart $pvesvc"
   systemctl restart $pvesvc 2>/dev/null || true
 done
+msg_info "Serviço 'pve-firewall' permanece parado até o final da configuração (Etapa 8)"
+pve-firewall stop
 msg_ok "Serviços reiniciados para o novo hostname"
 
 state_mark_step "hostname-and-restart"
