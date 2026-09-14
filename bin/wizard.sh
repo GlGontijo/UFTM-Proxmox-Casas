@@ -197,7 +197,8 @@ if [[ -z "${UFTM_NET_DONE:-}" ]]; then
           WAN_IP=$(whiptail --inputbox "IP inválido. IP da WAN (ex: 200.1.2.3):" 0 70 3>&2 2>&1 1>&3) || exit 1
         done
       else
-        whiptail --msgbox "Após obter o IP WAN, será necessário informar em Datacenter >> SDN >> Fabrics >> WG-FAB" 0 0
+        whiptail --msgbox "Após obter o IP WAN da interface PPPoE,\nserá necessário informar em Datacenter >> SDN >> Fabrics >> WG-FAB" 0 0
+      fi
       PPPOE_USER=$(whiptail --inputbox "Usuário PPPoE:" 0 60 3>&2 2>&1 1>&3) || exit 1
       PPPOE_PASS=$(whiptail --passwordbox "Senha PPPoE:" 0 60 3>&2 2>&1 1>&3) || exit 1
       PPPOE_MTU=$(whiptail --inputbox "MTU do PPPoE (padrão 1492):" 0 60 "1492" 3>&2 2>&1 1>&3) || exit 1
