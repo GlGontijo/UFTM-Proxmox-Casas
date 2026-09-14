@@ -48,7 +48,6 @@ SNAT_GATEWAY="172.31.0.1"
 : "${UFTM_WG_PORT:?Rode bin/wizard.sh primeiro (etapa 2)}"
 : "${UFTM_WG_TUNNEL_IP:?Rode bin/wizard.sh primeiro (etapa 2)}"
 : "${UFTM_SELECTED_VLANS:?Rode bin/wizard.sh primeiro (etapa 2)}"
-IS_HUB="${UFTM_IS_HUB:-n}"
 
 pvesh_try() {
   # pvesh_try <method> <path> [args...] -- retorna 0/1, nunca aborta o script
