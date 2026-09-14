@@ -95,6 +95,7 @@ for aptfile in /etc/apt/sources.list.d/*.sources; do
   fi
 done
 
+rm -f "$PVE_NOSUB" 2&>/dev/null
 cat >"$PVE_NOSUB" <<EOF
 Types: deb
 URIs: http://download.proxmox.com/debian/pve
@@ -103,28 +104,6 @@ Components: pve-no-subscription
 Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 EOF
 msg_ok "Repositório no-subscription habilitado"
-
-msg_info "Adicionando repositório 'ceph no-subscription' (deb822)"
-cat >"$CEPH_SOURCES" <<EOF
-Types: deb
-URIs: http://download.proxmox.com/debian/${CEPH_RELEASE}
-Suites: $CODENAME
-Components: no-subscription
-Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
-Enabled: false
-EOF
-msg_ok "Repositório 'ceph no-subscription' (${CEPH_RELEASE}) adicionado, mas desabilitado. Caso seja necessário o uso, habilitar via web"
-
-msg_info "Adicionando repositório 'pve-test' (deb822, disabled)"
-cat >"$TEST_SOURCES" <<EOF
-Types: deb
-URIs: http://download.proxmox.com/debian/pve
-Suites: $CODENAME
-Components: pve-test
-Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
-Enabled: false
-EOF
-msg_ok "Repositório 'pve-test' adicionado, mas desabilitado. Caso seja necessário o uso, habilitar via web"
 
 # ── 3) Remove nag de assinatura na UI ───────────────────────────
 msg_info "Removendo aviso de assinatura na Web UI"
