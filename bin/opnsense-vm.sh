@@ -91,8 +91,8 @@ if [[ "$VMID" > 0 ]]; then
   msg_ok "VM iniciada -- aguardando ~40s o boot do FreeBSD"
   sleep 40
 
-  # ── 4) Automação via expect: wizard inicial + gpart/growfs ───────
-  msg_info "Executando automação do console serial (wizard + expansão do FS)"
+  # ── 4) Automação via expect: wizard inicial ───────
+  msg_info "Executando automação do console serial (wizard)"
   expect <<EOF
 set timeout 60
 spawn qm terminal ${VMID}
@@ -113,20 +113,8 @@ expect {
     exit 1
   }
 }
-
-expect "# "
-send "gpart recover vtbd0\r"
-expect "# "
-send "gpart resize -i 3 vtbd0\r"
-expect "# "
-send "growfs -y /dev/vtbd0p3\r"
-expect "# "
-send "exit\r"
-expect "Enter an option:"
-send "\x0f"
-expect eof
 EOF
-  msg_ok "Wizard inicial concluído e filesystem expandido (vtnet0=WAN, vtnet1=LAN)"
+  msg_ok "Wizard inicial concluído (vtnet0=WAN, vtnet1=LAN)"
 
   # ── 5) Restauração de config.xml (se veio em cache de download-deps.sh) ──
   # O arquivo já foi baixado/escolhido/renomeado para config.xml na etapa 3.
@@ -136,53 +124,6 @@ EOF
   CONFIG_URL=""
   if [[ -n "${UFTM_OPN_CONFIG_XML_PATH:-}" && -f "$UFTM_OPN_CONFIG_XML_PATH" ]]; then
     CONFIG_LOCAL="$UFTM_OPN_CONFIG_XML_PATH"
-    msg_info "Garantindo MSS clamping (1320) nas interfaces com MTU 1360"
-    python3 - "$CONFIG_LOCAL" <<'PYEOF'
-import sys, xml.etree.ElementTree as ET
-
-path = sys.argv[1]
-tree = ET.parse(path)
-root = tree.getroot()
-
-ifaces = root.find("interfaces")
-if ifaces is None:
-    sys.exit(0)
-
-mtu1360 = [child.tag for child in ifaces
-           if (child.find("mtu") is not None and (child.find("mtu").text or "").strip() == "1360")]
-
-filt = root.find("filter")
-if filt is None:
-    filt = ET.SubElement(root, "filter")
-scrub = filt.find("scrub")
-if scrub is None:
-    scrub = ET.SubElement(filt, "scrub")
-
-existing = {r.find("interface").text for r in scrub.findall("rule") if r.find("interface") is not None}
-
-changed = False
-for ifc in mtu1360:
-    if ifc in existing:
-        continue
-    rule = ET.SubElement(scrub, "rule")
-    ET.SubElement(rule, "interface").text = ifc
-    ET.SubElement(rule, "proto").text = "any"
-    ET.SubElement(rule, "src").text = "any"
-    ET.SubElement(rule, "srcmask").text = "24"
-    ET.SubElement(rule, "dst").text = "any"
-    ET.SubElement(rule, "dstmask").text = "24"
-    ET.SubElement(rule, "max-mss").text = "1320"
-    ET.SubElement(rule, "descr").text = f"MSS Clamping - {ifc} (auto uftm-proxmox-casas)"
-    ET.SubElement(rule, "direction").text = "in"
-    changed = True
-    print(f"  + regra de MSS clamping adicionada para {ifc}")
-
-if changed:
-    tree.write(path, xml_declaration=True, encoding="UTF-8")
-else:
-    print("  (nada a fazer -- regras já presentes ou nenhuma interface com MTU 1360)")
-PYEOF
-    msg_ok "config.xml verificado/ajustado"
 
     SERVE_DIR=$(mktemp -d)
     cp "$CONFIG_LOCAL" "$SERVE_DIR/config.xml"
