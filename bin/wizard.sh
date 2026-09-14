@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # bin/wizard.sh
-# ETAPA 2 do fluxo. Reúne TODO o questionário do projeto num único lugar --
+# ETAPA 1 do fluxo. Reúne TODO o questionário do projeto num único lugar --
 # nenhum outro script (network-install, sdn-install, hostname-and-restart,
 # opnsense-vm, pve-firewall-config) pergunta nada ao usuário: todos leem o
 # arquivo de estado gravado aqui.
@@ -88,25 +88,9 @@ if [[ -z "${UFTM_HOSTNAME:-}" ]]; then
   state_set UFTM_BKP_URL "$UFTM_BKP_URL"
   msg_ok "Host selecionado: $UFTM_HOSTNAME"
 
-  HUB_HOSTNAME_PREFIX="pve-vpnserver"
-  UFTM_IS_HUB="n"
-  if [[ "$UFTM_HOSTNAME" == "$HUB_HOSTNAME_PREFIX"* ]]; then
-    if whiptail --yesno "Hostname começa com '$HUB_HOSTNAME_PREFIX'. Este é o nó HUB do fabric WireGuard?" 0 0; then
-      UFTM_IS_HUB="s"
-    fi
-  fi
-  state_set UFTM_IS_HUB "$UFTM_IS_HUB"
-fi
-
 # ═══════════════════════════════════════════════════════════════
-# 2) Dados sensíveis (IP WAN + chave WireGuard) -- nunca vão pro CSV
+# 2) Dados sensíveis (Chave WireGuard) -- nunca vai pro CSV
 # ═══════════════════════════════════════════════════════════════
-if [[ -z "${UFTM_IP_WAN_SET:-}" ]]; then
-  UFTM_IP_WAN=$(whiptail --inputbox "IP WAN deste site (deixe vazio se WAN=DHCP/PPPoE):" 0 70 3>&2 2>&1 1>&3) || exit 1
-  state_set UFTM_IP_WAN "$UFTM_IP_WAN"
-  state_set UFTM_IP_WAN_SET "1"
-fi
-
 if [[ -z "${UFTM_WG_PK_SET:-}" ]]; then
   WG_MODE=$(whiptail --menu "Chave privada WireGuard:" 0 60 2 \
     "informar" "Informar chave existente (padrão)" \
@@ -115,7 +99,9 @@ if [[ -z "${UFTM_WG_PK_SET:-}" ]]; then
   if [[ "$WG_MODE" == "gerar" ]]; then
     require_cmd wg
     UFTM_WG_PK=$(wg genkey)
-    whiptail --msgbox "Chave privada gerada. Chave pública correspondente:\n\n$(echo "$UFTM_WG_PK" | wg pubkey)\n\n(a privada fica só no estado local do host, nunca é exibida de novo)" 0 70
+    whiptail --msgbox "Chave privada gerada. Chave pública correspondente:\n
+       \n$(echo "$UFTM_WG_PK" | wg pubkey)\n
+       \n(a privada fica só no estado local do host, nunca é exibida de novo)" 0 70
   else
     UFTM_WG_PK=$(whiptail --inputbox "Chave privada WireGuard (WG_PK):" 0 70 3>&2 2>&1 1>&3) || exit 1
   fi
@@ -125,7 +111,7 @@ fi
 
 # ═══════════════════════════════════════════════════════════════
 # 3) Patrimônio / hostname final (NÃO aplica ainda -- isso é feito só na
-#    etapa 5, hostname-and-restart.sh, depois da rede já configurada)
+#    etapa hostname-and-restart.sh, depois da rede já configurada)
 # ═══════════════════════════════════════════════════════════════
 if [[ -z "${UFTM_PATRIMONIO:-}" ]]; then
   PATRIMONIO=""
@@ -141,23 +127,7 @@ if [[ -z "${UFTM_PATRIMONIO:-}" ]]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# 4) Domínio local + IP de gerência (necessário em /etc/hosts pro Proxmox
-#    subir corretamente -- aplicado na etapa 5)
-# ═══════════════════════════════════════════════════════════════
-if [[ -z "${UFTM_DOMAIN:-}" ]]; then
-  UFTM_DOMAIN=$(whiptail --inputbox "Domínio local (sufixo do FQDN, sem ponto inicial):" 0 60 "uftm" 3>&2 2>&1 1>&3) || exit 1
-  state_set UFTM_DOMAIN "$UFTM_DOMAIN"
-fi
-if [[ -z "${UFTM_MGMT_IP:-}" ]]; then
-  UFTM_MGMT_IP=$(whiptail --inputbox "IP de gerência deste host na VLAN de gestão (ex: 10.10.15.X, sem /máscara):" 0 70 3>&2 2>&1 1>&3) || exit 1
-  while ! is_valid_ipv4 "$UFTM_MGMT_IP"; do
-    UFTM_MGMT_IP=$(whiptail --inputbox "IP inválido. IP de gerência (ex: 10.10.15.X):" 0 70 3>&2 2>&1 1>&3) || exit 1
-  done
-  state_set UFTM_MGMT_IP "$UFTM_MGMT_IP"
-fi
-
-# ═══════════════════════════════════════════════════════════════
-# 5) Rede: WAN (DHCP/Fixo/PPPoE), LAN trunk, console opcional
+# 4) Rede: WAN (DHCP/Fixo/PPPoE), LAN trunk, console opcional
 # ═══════════════════════════════════════════════════════════════
 if [[ -z "${UFTM_NET_DONE:-}" ]]; then
   mapfile -t NIC_LIST < <(ip -o link show | awk -F': ' '{print $2}' | \
@@ -206,13 +176,28 @@ if [[ -z "${UFTM_NET_DONE:-}" ]]; then
   WAN_MODE=$(whiptail --menu "Modo de conexão da WAN:" 0 60 3 \
     "dhcp" "DHCP" "static" "IP Fixo" "pppoe" "PPPoE (provedor UFTM)" 3>&2 2>&1 1>&3) || exit 1
 
-  WAN_IP=""; WAN_GW=""; PPPOE_USER=""; PPPOE_PASS=""; PPPOE_MTU=1492
+  WAN_IP=""; WAN_MASK=""; WAN_CIDR=""; WAN_GW=""; PPPOE_USER=""; PPPOE_PASS=""; PPPOE_MTU=1492
   case "$WAN_MODE" in
     static)
-      WAN_IP=$(whiptail --inputbox "IP/CIDR da WAN (ex: 200.1.2.3/29):" 0 60 3>&2 2>&1 1>&3) || exit 1
+      WAN_IP=$(whiptail --inputbox "IP da WAN sem máscara (ex: 200.1.2.3):" 0 60 3>&2 2>&1 1>&3) || exit 1
+      while ! is_valid_ipv4 "$WAN_IP"; do
+        WAN_IP=$(whiptail --inputbox "IP inválido. IP da WAN (ex: 200.1.2.3):" 0 70 3>&2 2>&1 1>&3) || exit 1
+      done
+      WAN_MASK=$(whiptail --inputbox "Máscara (CIDR) da WAN (ex: 24):" 0 60 "24" 3>&2 2>&1 1>&3) || exit 1
       WAN_GW=$(whiptail --inputbox "Gateway da WAN:" 0 60 3>&2 2>&1 1>&3) || exit 1
+      while ! is_valid_ipv4 "$WAN_GW"; do
+        WAN_GW=$(whiptail --inputbox "IP inválido. IP do gateway da WAN:" 0 70 3>&2 2>&1 1>&3) || exit 1
+      done
+      WAN_CIDR="${WAN_IP}/${WAN_MASK}"
       ;;
     pppoe)
+      if whiptail --yesno "Informar IP WAN fixo para a interface PPPoE?\n\nSerá usado na configuração do Wireguard" 0 0; then
+        WAN_IP=$(whiptail --inputbox "IP da WAN sem máscara (ex: 200.1.2.3):" 0 60 3>&2 2>&1 1>&3) || exit 1
+        while ! is_valid_ipv4 "$WAN_IP"; do
+          WAN_IP=$(whiptail --inputbox "IP inválido. IP da WAN (ex: 200.1.2.3):" 0 70 3>&2 2>&1 1>&3) || exit 1
+        done
+      else
+        whiptail --msgbox "Após obter o IP WAN, será necessário informar em Datacenter >> SDN >> Fabrics >> WG-FAB" 0 0
       PPPOE_USER=$(whiptail --inputbox "Usuário PPPoE:" 0 60 3>&2 2>&1 1>&3) || exit 1
       PPPOE_PASS=$(whiptail --passwordbox "Senha PPPoE:" 0 60 3>&2 2>&1 1>&3) || exit 1
       PPPOE_MTU=$(whiptail --inputbox "MTU do PPPoE (padrão 1492):" 0 60 "1492" 3>&2 2>&1 1>&3) || exit 1
@@ -227,17 +212,31 @@ if [[ -z "${UFTM_NET_DONE:-}" ]]; then
   fi
   confirm_or_new_bridge "$LAN_NIC" "LAN (trunk)" LAN_BRIDGE
 
-  CONSOLE_BRIDGE=""; CONSOLE_NIC=""; CONSOLE_CIDR=""
+  CONSOLE_BRIDGE=""; CONSOLE_NIC=""; CONSOLE_IP=""; CONSOLE_MASK=""; CONSOLE_CIDR=""
   if whiptail --yesno "Configurar uma interface dedicada de console/gerência (ex: vmcsl, 192.168.100.1/24)?" 0 0; then
     CONSOLE_NIC=$(nic_menu "Interface física para console:") || exit 1
     confirm_or_new_bridge "$CONSOLE_NIC" "Console" CONSOLE_BRIDGE
-    CONSOLE_CIDR=$(whiptail --inputbox "IP/CIDR do console:" 0 60 "192.168.100.1/24" 3>&2 2>&1 1>&3) || exit 1
+    CONSOLE_IP=$(whiptail --inputbox "IP do console (sem máscara):" 0 60 "192.168.100.1" 3>&2 2>&1 1>&3) || exit 1
+    while ! is_valid_ipv4 "$CONSOLE_IP"; do
+      CONSOLE_IP=$(whiptail --inputbox "IP inválido. IP do console (ex: 192.168.100.1):" 0 70 3>&2 2>&1 1>&3) || exit 1
+    done
+    CONSOLE_MASK=$(whiptail --inputbox "Máscara (CIDR) do console:" 0 60 "24" 3>&2 2>&1 1>&3) || exit 1
+    CONSOLE_CIDR="${CONSOLE_IP}/${CONSOLE_MASK}"
+    UFTM_MGMT_IP="${CONSOLE_IP}"
+  else
+    whiptail --msgbox "Interface console não será instalada no host.\nSerá definida a interface WAN para gerenciamento" 0 0
+    while ! is_valid_ipv4 "$WAN_IP"; do
+      WAN_IP=$(whiptail --inputbox "IP inválido. IP da WAN (ex: 192.168.100.1):" 0 70 3>&2 2>&1 1>&3) || exit 1
+    done
+    UFTM_MGMT_IP="${WAN_IP}"
   fi
-
+  
   state_set UFTM_WAN_NIC "$WAN_NIC"
   state_set UFTM_WAN_BRIDGE "$WAN_BRIDGE"
   state_set UFTM_WAN_MODE "$WAN_MODE"
   state_set UFTM_WAN_IP "$WAN_IP"
+  state_set UFTM_WAN_MASK "$WAN_MASK"
+  state_set UFTM_WAN_CIDR "$WAN_CIDR"
   state_set UFTM_WAN_GW "$WAN_GW"
   state_set UFTM_PPPOE_USER "$PPPOE_USER"
   state_set UFTM_PPPOE_PASS "$PPPOE_PASS"
@@ -247,8 +246,17 @@ if [[ -z "${UFTM_NET_DONE:-}" ]]; then
   state_set UFTM_CONSOLE_NIC "$CONSOLE_NIC"
   state_set UFTM_CONSOLE_BRIDGE "$CONSOLE_BRIDGE"
   state_set UFTM_CONSOLE_CIDR "$CONSOLE_CIDR"
+  state_set UFTM_MGMT_IP "$UFTM_MGMT_IP"
   state_set UFTM_NET_DONE "1"
   msg_ok "Configuração de rede coletada"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# 5) Domínio local
+# ═══════════════════════════════════════════════════════════════
+if [[ -z "${UFTM_DOMAIN:-}" ]]; then
+  UFTM_DOMAIN=$(whiptail --inputbox "Domínio local (sufixo do FQDN, sem ponto inicial):" 0 60 "uftm" 3>&2 2>&1 1>&3) || exit 1
+  state_set UFTM_DOMAIN "$UFTM_DOMAIN"
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -271,7 +279,7 @@ fi
 
 # ═══════════════════════════════════════════════════════════════
 # 7) OPNsense: parâmetros da VM + origem do backup (SEM baixar nada
-#    ainda -- isso é feito na etapa 3, download-deps.sh)
+#    ainda -- isso é feito na etapa download-deps.sh)
 # ═══════════════════════════════════════════════════════════════
 if [[ "$UFTM_OPNSENSE" =~ ^[SsYy] ]] && [[ -z "${UFTM_OPNSENSE_PARAMS_DONE:-}" ]]; then
   OPN_STORAGE=$(whiptail --inputbox "Storage para o disco da VM OPNsense:" 0 60 "local-lvm" 3>&2 2>&1 1>&3) || exit 1
