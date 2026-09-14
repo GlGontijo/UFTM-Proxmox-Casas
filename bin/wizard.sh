@@ -35,10 +35,6 @@ if [[ -f "$UFTM_STATE_FILE" ]] && [[ "${UFTM_WIZARD_DONE:-0}" != "1" ]] && [[ -n
     rm -f "$UFTM_STATE_FILE"
     state_load 2>/dev/null || true
   fi
-elif [[ -f "$UFTM_STATE_FILE" ]] && [[ "${UFTM_WIZARD_DONE:-0}" == "1" ]]; then
-  if whiptail --yesno "Já existe uma configuração completa para '$UFTM_HOSTNAME' neste host.\n\nRefazer o wizard do zero? (Não = manter e pular direto pro resumo)" 0 0; then
-    rm -f "$UFTM_STATE_FILE"
-  fi
 else 
   msg_ok "Primeira vez por aqui? Vamos seguir do zero então."
 fi
