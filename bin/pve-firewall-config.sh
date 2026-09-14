@@ -72,7 +72,7 @@ cat >"$CLUSTER_FW" <<EOF
 
 enable: 1
 
-[IPSET ipswan-uftm] # Faixas de IPs WAN da UFTM (definidas no wizard, não vão pro Git)
+[IPSET ipswan-uftm] # Faixas de IPs WAN da UFTM (definidas no wizard)
 
 ${IPSET_LINES}
 [RULES]
@@ -85,7 +85,7 @@ IN ACCEPT -i wg0 -log info # Wireguard Interface
 
 [group uftm_access] # Regras para liberação de acesso remoto
 
-IN ACCEPT -source +dc/ipswan-uftm -p udp -dport 51820 -log info # Allow UFTM Access - Wireguard
+IN ACCEPT -source +dc/ipswan-uftm -p udp -dport ${UFTM_WG_PORT} -log info # Allow UFTM Access - Wireguard
 IN ACCEPT -source +dc/ipswan-uftm -p tcp -dport 8006 -log info # Allow UFTM Access - Proxmox
 IN ACCEPT -source +dc/ipswan-uftm -p udp -dport 161 -log info # Allow UFTM Access - SNMP
 IN SSH(ACCEPT) -source +dc/ipswan-uftm -log info # Allow UFTM Access - SSH
