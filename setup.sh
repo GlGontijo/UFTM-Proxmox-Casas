@@ -7,18 +7,17 @@
 # depois que a rede final é escrita):
 #   0) Desliga o pve-firewall (fica desligado o processo INTEIRO; só volta
 #      ligado no fim da etapa 8).
-#   1) post-install.sh        - parametriza repositórios e atualiza o sistema
-#   2) wizard.sh               - TODO o questionário do projeto, resumível
-#   3) download-deps.sh        - todo apt-get/download do projeto (com a
+#   1) wizard.sh               - TODO o questionário do projeto, resumível
+#   2) download-deps.sh        - todo apt-get/download do projeto (com a
 #                                 internet do laboratório ainda de pé)
-#   4) network-install.sh      - grava a rede final (WAN/LAN/PPPoE/VLANs) --
+#   3) network-install.sh      - grava a rede final (WAN/LAN/PPPoE/VLANs) --
 #                                 a internet do laboratório pode cair aqui
-#   5) hostname-and-restart.sh - aplica hostname, IP de gerência, restart
+#   4) hostname-and-restart.sh - aplica hostname, IP de gerência, restart
 #                                 de rede + serviços do Proxmox
-#   6) sdn-install.sh          - fabric WireGuard + EVPN + vnets + SNAT
-#   7) opnsense-vm.sh          - VM OPNsense (se solicitado no wizard)
-#   8) pve-firewall-config.sh  - SNMP + Syslog + regras + liga o firewall
-#   9) resumo final + reboot opcional
+#   5) sdn-install.sh          - fabric WireGuard + EVPN + vnets + SNAT
+#   6) opnsense-vm.sh          - VM OPNsense (se solicitado no wizard)
+#   7) pve-firewall-config.sh  - SNMP + Syslog + regras + liga o firewall
+#   8) resumo final + reboot opcional
 #
 # Chamado normalmente pelo bootstrap.sh, mas pode ser executado direto:
 #   ./setup.sh [-c /caminho/hosts.csv]
@@ -61,11 +60,7 @@ run_step() {
 }
 
 echo ""
-echo "════════════════════ ETAPA 1/9: post-install ════════════════════"
-run_step "$BIN_DIR/post-install.sh"
-
-echo ""
-echo "════════════════════ ETAPA 2/9: wizard ═══════════════════════════"
+echo "════════════════════ ETAPA 1/8: wizard ═══════════════════════════"
 run_step "$BIN_DIR/wizard.sh"
 
 # A partir daqui, tudo já foi decidido -- carrega o estado gravado pelo wizard.
@@ -73,25 +68,25 @@ state_load
 : "${UFTM_WIZARD_DONE:?O wizard não foi concluído -- rode de novo}"
 
 echo ""
-echo "════════════════════ ETAPA 3/9: download de dependências ════════"
+echo "════════════════════ ETAPA 2/8: download de dependências ════════"
 run_step "$BIN_DIR/download-deps.sh"
 
 echo ""
-echo "════════════════════ ETAPA 4/9: rede (WAN/LAN/VLANs) ═════════════"
+echo "════════════════════ ETAPA 3/8: rede (WAN/LAN/VLANs) ═════════════"
 msg_warn "A partir daqui a internet deste laboratório pode cair de propósito."
 run_step "$BIN_DIR/network-install.sh"
 
 echo ""
-echo "════════════════════ ETAPA 5/9: hostname + restart ═══════════════"
+echo "════════════════════ ETAPA 4/8: hostname + restart ═══════════════"
 run_step "$BIN_DIR/hostname-and-restart.sh"
 
 echo ""
-echo "════════════════════ ETAPA 6/9: SDN (fabric/EVPN/vnets) ══════════"
+echo "════════════════════ ETAPA 5/8: SDN (fabric/EVPN/vnets) ══════════"
 run_step "$BIN_DIR/sdn-install.sh"
 run_step "$BIN_DIR/evpn-bind-vlan.sh"
 
 echo ""
-echo "════════════════════ ETAPA 7/9: VM OPNsense ══════════════════════"
+echo "════════════════════ ETAPA 6/8: VM OPNsense ══════════════════════"
 if [[ "${UFTM_OPNSENSE:-n}" =~ ^[SsYy] ]]; then
   run_step "$BIN_DIR/opnsense-vm.sh"
 else
@@ -99,11 +94,11 @@ else
 fi
 
 echo ""
-echo "════════════════════ ETAPA 8/9: firewall ═════════════════════════"
+echo "════════════════════ ETAPA 7/8: firewall ═════════════════════════"
 run_step "$BIN_DIR/pve-firewall-config.sh"
 
 echo ""
-echo "════════════════════ ETAPA 9/9: resumo final ═════════════════════"
+echo "════════════════════ ETAPA 8/8: resumo final ═════════════════════"
 state_load
 msg_ok "Setup concluído para ${UFTM_HOSTNAME_FINAL:-$(hostname)}"
 if [[ -n "${UFTM_RUN_BACKUP_DIR:-}" ]]; then
