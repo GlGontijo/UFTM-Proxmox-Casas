@@ -103,7 +103,7 @@ IFACE_STR="name=${WG_IFACE},listen_port=${UFTM_WG_PORT},public_key=${WG_PUBKEY},
 PEER_STR="type=external,node=${HUB_HOSTNAME},iface=${WG_IFACE}"
 if pvesh_try create "$NODE_COLLECTION" \
     -node_id "$UFTM_HOSTNAME_FINAL" -allowed-ips "$FABRIC_ALLOWED_IPS" \
-    -endpoint "${UFTM_IP_WAN:-auto}" -role internal \
+    -endpoint "${UFTM_WAN_IP:-auto}" -role internal \
     -interfaces "$IFACE_STR" -peers "$PEER_STR" ; then
   msg_ok "Nó spoke registrado"
 else
