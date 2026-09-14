@@ -57,6 +57,7 @@ if [[ -z "${UFTM_HOSTNAME:-}" ]]; then
     csv_validate_columns "$CSV_FILE" "$CSV_EXPECTED_COLS" >&2 || true
     exit 1
   fi
+fi
 
   menu_items=()
   while IFS=';' read -r host _; do
@@ -319,7 +320,7 @@ fi
 #    (NUNCA vai pro Git -- fica só no estado local deste host)
 # ═══════════════════════════════════════════════════════════════
 if [[ -z "${UFTM_FW_ALLOWED_IPS:-}" ]]; then
-  whiptail --msgbox "Agora informe as faixas de IP WAN da UFTM que podem acessar este host (SSH, 8006, WireGuard, SNMP).\n\nUma por linha ou separadas por espaço. Ex:\n186.248.203.208/28\n200.131.62.125\n200.131.62.128/25\n\nEsses IPs NÃO vão para o repositório Git -- ficam só no estado local deste host." 0 78
+  whiptail --msgbox "Agora informe as faixas de IP WAN da UFTM que podem acessar este host (SSH, 8006, WireGuard, SNMP).\n\nIP ou CIDR, separadas por espaço. Ex: 186.248.203.208/28 200.131.62.125 200.131.62.128/25" 0 78
   FW_IPS=$(whiptail --inputbox "Faixas de IP (separadas por espaço):" 0 78 \
     "186.248.203.208/28 200.131.62.125 200.131.62.128/25" 3>&2 2>&1 1>&3) || exit 1
   [[ -z "$FW_IPS" ]] && { msg_error "É necessário pelo menos uma faixa de IP autorizada."; exit 1; }
