@@ -84,8 +84,8 @@ else
       -persistent_keepalive 10 >/dev/null; then
     msg_ok "Fabric $FABRIC_ID criado via pvesh"
   else
-    msg_warn "pvesh falhou ao criar o fabric (log em /tmp/uftm-pvesh-err.log)."
-    cat /tmp/uftm-pvesh-err.log >&2 || true
+    msg_warn "pvesh falhou ao criar o fabric -- veja $PVESH_LOG"
+    tail -n 40 "$PVESH_LOG" >&2
   fi
 fi
 
@@ -97,10 +97,11 @@ ENDPOINT_STR="${HUB_ENDPOINT}:${UFTM_WG_PORT}"
 if pvesh_try create "$NODE_COLLECTION" \
     -node_id "$HUB_HOSTNAME" -protocol wireguard \
     -allowed_ips "${HUB_LOOPBACK_IP}/32" -endpoint ${ENDPOINT_STR} \
-    -public_key "$HUB_PUBKEY" -role external ; then
+    -public_key "$HUB_PUBKEY" -role external >/dev/null; then
   msg_ok "Nó hub registrado"
 else
-  msg_warn "pvesh falhou ao registrar o nó hub -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
+  msg_warn "pvesh falhou ao registrar o nó hub -- veja $PVESH_LOG"
+  tail -n 40 "$PVESH_LOG" >&2
 fi
 
 NODE_ID="${FABRIC_ID}_${UFTM_HOSTNAME_FINAL}"
@@ -110,11 +111,11 @@ PEER_STR="type=external,node=${HUB_HOSTNAME},iface=${WG_IFACE}"
 if pvesh_try create "$NODE_COLLECTION" \
     -node_id "$UFTM_HOSTNAME_FINAL" -protocol wireguard -allowed_ips "$FABRIC_ALLOWED_IPS" \
     -endpoint "${UFTM_WAN_IP:-auto}" -role internal \
-    -interfaces "$IFACE_STR" -peers "$PEER_STR" ; then
+    -interfaces "$IFACE_STR" -peers "$PEER_STR" >/dev/null; then
   msg_ok "Nó spoke registrado"
 else
-  msg_warn "pvesh falhou ao registrar o nó spoke -- verifique /tmp/uftm-pvesh-err.log (schema ainda não confirmado, ver comentário acima)"
-  msg_warn "Confirme manualmente se o hub ($HUB_HOSTNAME) já tem a chave pública deste spoke autorizada."
+  msg_warn "pvesh falhou ao registrar o nó spoke -- veja $PVESH_LOG"
+  tail -n 40 "$PVESH_LOG" >&2
 fi
 
 
@@ -142,7 +143,8 @@ else
       -peers "${HUB_LOOPBACK_IP}, ${UFTM_WG_TUNNEL_IP}" >/dev/null; then
     msg_ok "Controller $EVPN_CONTROLLER criado"
   else
-    msg_warn "Falha ao criar controller -- verifique /tmp/uftm-pvesh-err.log"
+    msg_warn "Falha ao criar controller -- veja $PVESH_LOG"
+    tail -n 40 "$PVESH_LOG" >&2
   fi
 fi
 
@@ -156,7 +158,8 @@ else
       -vrf-vxlan "$EVPN_VRF_VXLAN" -ipam pve -mtu "$EVPN_ZONE_MTU" >/dev/null; then
     msg_ok "Zone $EVPN_ZONE criada (MTU $EVPN_ZONE_MTU)"
   else
-    msg_warn "Falha ao criar zone EVPN -- verifique /tmp/uftm-pvesh-err.log"
+    msg_warn "Falha ao criar zone EVPN -- veja $PVESH_LOG"
+    tail -n 40 "$PVESH_LOG" >&2
   fi
 fi
 
@@ -175,7 +178,8 @@ for vlan in $SELECTED_VLANS; do
         -alias "Vnet Bridge Vlan${vlan}" >/dev/null; then
       msg_ok "vnet $vnet criado"
     else
-      msg_warn "Falha ao criar vnet $vnet -- verifique /tmp/uftm-pvesh-err.log"
+      msg_warn "Falha ao criar vnet $vnet -- veja $PVESH_LOG"
+    tail -n 40 "$PVESH_LOG" >&2
     fi
   fi
 done
@@ -185,7 +189,8 @@ msg_info "Verificando zone de SNAT $SNAT_ZONE"
 if ! pvesh_try get "/cluster/sdn/zones/$SNAT_ZONE" >/dev/null; then
   pvesh_try create /cluster/sdn/zones -zone "$SNAT_ZONE" -type simple -ipam pve >/dev/null \
     && msg_ok "Zone $SNAT_ZONE criada" \
-    || msg_warn "Falha ao criar zone SNAT -- verifique /tmp/uftm-pvesh-err.log"
+    || msg_warn "Falha ao criar zone SNAT -- veja $PVESH_LOG"
+    tail -n 40 "$PVESH_LOG" >&2
 else
   msg_ok "Zone $SNAT_ZONE já existe"
 fi
@@ -195,7 +200,8 @@ if ! pvesh_try get "/cluster/sdn/vnets/$SNAT_VNET" >/dev/null; then
   pvesh_try create /cluster/sdn/vnets -vnet "$SNAT_VNET" -zone "$SNAT_ZONE" \
     -alias "SNAT to VM Interfaces" >/dev/null \
     && msg_ok "vnet $SNAT_VNET criado" \
-    || msg_warn "Falha ao criar vnet SNAT -- verifique /tmp/uftm-pvesh-err.log"
+    || msg_warn "Falha ao criar vnet SNAT -- veja $PVESH_LOG"
+    tail -n 40 "$PVESH_LOG" >&2
 else
   msg_ok "vnet $SNAT_VNET já existe"
 fi
@@ -206,7 +212,8 @@ if ! pvesh_try get "/cluster/sdn/vnets/$SNAT_VNET/subnets/$SNAT_SUBNET_ID" >/dev
   pvesh_try create "/cluster/sdn/vnets/$SNAT_VNET/subnets" \
     -subnet "$SNAT_SUBNET_CIDR" -type subnet -gateway "$SNAT_GATEWAY" -snat 1 >/dev/null \
     && msg_ok "subnet SNAT criada ($SNAT_SUBNET_CIDR, gw $SNAT_GATEWAY)" \
-    || msg_warn "Falha ao criar subnet SNAT -- verifique /tmp/uftm-pvesh-err.log"
+    || msg_warn "Falha ao criar subnet SNAT -- veja $PVESH_LOG"
+    tail -n 40 "$PVESH_LOG" >&2
 else
   msg_ok "subnet SNAT já existe"
 fi
@@ -250,4 +257,3 @@ fi
 
 state_mark_step "sdn-install"
 msg_ok "sdn-install.sh concluído"
-msg_warn "Diagnósticos pendentes conhecidos: Hold Timer Expired no BGP com pve-odonto (jitter PPPoE) e MTU do wg0 (SDN Fabric ainda não expõe campo de MTU para WireGuard) -- acompanhar separadamente."
