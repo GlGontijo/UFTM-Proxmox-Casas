@@ -27,13 +27,6 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-set -euo pipefail
-
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." &>/dev/null && pwd)"
-source "$SCRIPT_DIR/lib/common.sh"
-
-require_root
-
 PVE_VERSION="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
 IFS='.' read -r PVE_MAJOR PVE_MINOR _ <<<"$(echo "$PVE_VERSION")"
 
@@ -67,7 +60,6 @@ msg_info "Nome de versão Debian detectada: $CODENAME"
 
 # ── 1) Repositório Debian correto (main/updates/security) ─────
 msg_info "Configurando repositórios Debian ($CODENAME)"
-backup_if_exists "$DEBIAN_SOURCES"
 cat >"$DEBIAN_SOURCES" <<EOF
 Types: deb
 URIs: http://deb.debian.org/debian
@@ -94,12 +86,10 @@ msg_info "Ajustando repositórios Proxmox VE"
 for aptfile in /etc/apt/sources.list.d/*.sources; do
   msg_info "Removendo repositórios '*-enterprise'..."
   if grep -q "Components:.*pve-enterprise" "$aptfile" 2>/dev/null; then
-    backup_if_exists "$aptfile"
     rm -f "$aptfile"
     msg_ok "Repositório 'pve-enterprise' removido"
   fi
   if grep -q "enterprise.proxmox.com.*ceph" "$aptfile" 2>/dev/null; then
-    backup_if_exists "$aptfile"
     rm -f "$aptfile"
     msg_ok "Repositório 'ceph-enterprise' removido"
   fi
@@ -141,7 +131,6 @@ msg_info "Removendo aviso de assinatura na Web UI"
 JS_FILE="/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
 APT_HOOK="/etc/apt/apt.conf.d/no-nag-script"
 if [[ -f "$JS_FILE" ]] && ! grep -q "NoMoreNagging" "$JS_FILE"; then
-  backup_if_exists "$JS_FILE"
   sed -i.bak 's/res\[0\]\[.status.\] !== .Active./false/g' "$JS_FILE" || true
 fi
 cat >"$APT_HOOK" <<'EOF'
