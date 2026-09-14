@@ -96,7 +96,7 @@ msg_info "Registrando nó HUB ($HUB_HOSTNAME)"
 ENDPOINT_STR="${HUB_ENDPOINT}:${UFTM_WG_PORT}"
 if pvesh_try create "$NODE_COLLECTION" \
     -node_id "$HUB_HOSTNAME" -protocol wireguard \
-    -allowed-ips "${HUB_LOOPBACK_IP}/32" -endpoint ${ENDPOINT_STR} \
+    -allowed_ips "${HUB_LOOPBACK_IP}/32" -endpoint ${ENDPOINT_STR} \
     -public_key "$HUB_PUBKEY" -role external ; then
   msg_ok "Nó hub registrado"
 else
@@ -108,7 +108,7 @@ msg_info "Registrando nó SPOKE ($UFTM_HOSTNAME_FINAL), peer = hub ($HUB_HOSTNAM
 IFACE_STR="name=${WG_IFACE},listen_port=${UFTM_WG_PORT},public_key=${WG_PUBKEY},ip=${UFTM_WG_TUNNEL_IP}/24"
 PEER_STR="type=external,node=${HUB_HOSTNAME},iface=${WG_IFACE}"
 if pvesh_try create "$NODE_COLLECTION" \
-    -node_id "$UFTM_HOSTNAME_FINAL" -allowed-ips "$FABRIC_ALLOWED_IPS" \
+    -node_id "$UFTM_HOSTNAME_FINAL" -allowed_ips "$FABRIC_ALLOWED_IPS" \
     -endpoint "${UFTM_WAN_IP:-auto}" -role internal \
     -interfaces "$IFACE_STR" -peers "$PEER_STR" ; then
   msg_ok "Nó spoke registrado"
