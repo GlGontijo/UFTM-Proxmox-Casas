@@ -327,7 +327,6 @@ fi
 # ═══════════════════════════════════════════════════════════════
 # Resumo final
 # ═══════════════════════════════════════════════════════════════
-state_load
 SUMMARY="Host final: ${UFTM_HOSTNAME_FINAL}
 IP WAN: ${UFTM_IP_WAN:-<${UFTM_WAN_MODE}>}
 WG Porta/Tunnel: ${UFTM_WG_PORT} / ${UFTM_WG_TUNNEL_IP}
