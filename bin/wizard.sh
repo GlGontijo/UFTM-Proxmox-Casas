@@ -316,7 +316,7 @@ wizard() {
 
 # ── Retomar? ──────────────────────────────────────────────────────
 state_load
-if [[ -n "${UFTM_HOSTNAME:-}" ]]; then
+if [[ ! -z "${UFTM_HOSTNAME:-}" ]]; then
   if whiptail --yesno "Encontrei uma configuração de wizard iniciada para '$UFTM_HOSTNAME'.\n\nRetomar de onde parou? (Não = começar um wizard novo do zero)" 0 0; then
     msg_ok "Retomando estado anterior"
   else  
