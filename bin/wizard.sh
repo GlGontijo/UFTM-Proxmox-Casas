@@ -196,9 +196,9 @@ if [[ "${UFTM_NET_DONE:-0}" != "1" ]]; then
       else
         whiptail --msgbox "Após obter o IP WAN da interface PPPoE,\nserá necessário informar em Datacenter >> SDN >> Fabrics >> WG-FAB" 0 0
       fi
-      PPPOE_USER=$(whiptail --inputbox "Usuário PPPoE:" 0 60 3>&2 2>&1 1>&3) || exit 1
-      PPPOE_PASS=$(whiptail --passwordbox "Senha PPPoE:" 0 60 3>&2 2>&1 1>&3) || exit 1
-      PPPOE_MTU=$(whiptail --inputbox "MTU do PPPoE (padrão 1492):" 0 60 "1492" 3>&2 2>&1 1>&3) || exit 1
+      PPPOE_USER=$(whiptail --inputbox "Usuário PPPoE:" 0 0 3>&2 2>&1 1>&3) || exit 1
+      PPPOE_PASS=$(whiptail --passwordbox "Senha PPPoE:" 0 0 3>&2 2>&1 1>&3) || exit 1
+      PPPOE_MTU=$(whiptail --inputbox "MTU do PPPoE (padrão 1492):" 0 0 "1492" 3>&2 2>&1 1>&3) || exit 1
       [[ -z "$PPPOE_USER" || -z "$PPPOE_PASS" ]] && { msg_error "Usuário e senha PPPoE são obrigatórios."; exit 1; }
       ;;
   esac
