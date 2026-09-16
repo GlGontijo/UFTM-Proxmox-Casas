@@ -27,7 +27,7 @@ wizard() {
   # ═══════════════════════════════════════════════════════════════
   # 1) Host: CSV ou manual
   # ═══════════════════════════════════════════════════════════════
-  if [[ "${UFTM_HOST_SET:-0}" == "1" ]]; then
+  if [[ "${UFTM_HOST_SET:-0}" != "1" ]]; then
     if [[ -f "$CSV_FILE" ]]; then
       if ! csv_validate_columns "$CSV_FILE" "$CSV_EXPECTED_COLS"; then
         msg_error "hosts.csv com linha(s) malformada(s) (colunas != $CSV_EXPECTED_COLS):"
