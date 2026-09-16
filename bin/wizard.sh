@@ -24,6 +24,8 @@ CSV_FILE="${UFTM_CSV_FILE:-$SCRIPT_DIR/data/hosts.csv}"
 CSV_EXPECTED_COLS=5
 
 wizard() {
+  state_load
+  
   # ═══════════════════════════════════════════════════════════════
   # 1) Host: CSV ou manual
   # ═══════════════════════════════════════════════════════════════
@@ -313,8 +315,8 @@ wizard() {
 }
 
 # ── Retomar? ──────────────────────────────────────────────────────
+state_load
 if [[ -f "$UFTM_STATE_FILE" ]]; then
-  state_load
   if [[ -n "${UFTM_HOSTNAME:-}" ]]; then
     if whiptail --yesno "Encontrei uma configuração de wizard iniciada para '$UFTM_HOSTNAME'.\n\nRetomar de onde parou? (Não = começar um wizard novo do zero)" 0 0; then
       msg_ok "Retomando estado anterior"
@@ -332,6 +334,7 @@ state_load
 
 while [[ "${UFTM_WIZARD_DONE}" != "1" ]]; do
   wizard
+  
   # ═══════════════════════════════════════════════════════════════
   # Resumo final
   # ═══════════════════════════════════════════════════════════════
