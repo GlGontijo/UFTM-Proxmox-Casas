@@ -105,7 +105,7 @@ state_set() {
   else
     echo "${name}=${esc_value}" >>"$UFTM_STATE_FILE"
   fi
-  export "${name}=${value}"
+  export "${name}='${value}'"
 }
 
 # state_mark_step <nome_da_etapa>
