@@ -97,7 +97,7 @@ wizard() {
   # 3) Patrimônio / hostname final (NÃO aplica ainda -- isso é feito só na
   #    etapa hostname-and-restart.sh, depois da rede já configurada)
   # ═══════════════════════════════════════════════════════════════
-  if [[ ! "$UFTM_PATRIMONIO" =~ ^[0-9]+$ ]]; then
+  if [[ -z "${UFTM_PATRIMONIO:-}" ]]; then
     PATRIMONIO=""
     while [[ -z "$PATRIMONIO" ]]; do
       PATRIMONIO=$(whiptail --inputbox "Número de patrimônio do PC:" 0 60 3>&2 2>&1 1>&3) || exit 1
@@ -314,7 +314,7 @@ wizard() {
 
 # ── Retomar? ──────────────────────────────────────────────────────
 state_load
-if [[ ! -z "${UFTM_HOSTNAME:-}" ]]; then
+if [[ -z "${UFTM_HOSTNAME:-}" ]]; then
   if whiptail --yesno "Encontrei uma configuração de wizard iniciada para '$UFTM_HOSTNAME'.\n\nRetomar de onde parou? (Não = começar um wizard novo do zero)" 0 0; then
     msg_ok "Retomando estado anterior"
   else  
