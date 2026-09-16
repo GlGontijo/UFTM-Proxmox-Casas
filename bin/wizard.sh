@@ -316,14 +316,12 @@ wizard() {
 
 # ── Retomar? ──────────────────────────────────────────────────────
 state_load
-if [[ -f "$UFTM_STATE_FILE" ]]; then
-  if [[ -n "${UFTM_HOSTNAME:-}" ]]; then
-    if whiptail --yesno "Encontrei uma configuração de wizard iniciada para '$UFTM_HOSTNAME'.\n\nRetomar de onde parou? (Não = começar um wizard novo do zero)" 0 0; then
-      msg_ok "Retomando estado anterior"
-    else  
-      rm -f "$UFTM_STATE_FILE"
-      state_set UFTM_WIZARD_DONE "0" 
-    fi
+if [[ -n "${UFTM_HOSTNAME:-}" ]]; then
+  if whiptail --yesno "Encontrei uma configuração de wizard iniciada para '$UFTM_HOSTNAME'.\n\nRetomar de onde parou? (Não = começar um wizard novo do zero)" 0 0; then
+    msg_ok "Retomando estado anterior"
+  else  
+    rm -f "$UFTM_STATE_FILE"
+    state_set UFTM_WIZARD_DONE "0" 
   fi
 else 
   msg_ok "Primeira vez por aqui? Vamos seguir do zero então."
@@ -332,7 +330,7 @@ fi
 
 state_load
 
-while [[ "${UFTM_WIZARD_DONE}" != "1" ]]; do
+while [[ "${UFTM_WIZARD_DONE:-0}" != "1" ]]; do
   wizard
   
   # ═══════════════════════════════════════════════════════════════
