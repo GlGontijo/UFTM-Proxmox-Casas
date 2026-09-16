@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 UFTM_ETC_DIR="/etc/uftm-proxmox-casas"
 UFTM_BACKUP_ROOT="${SCRIPT_DIR}/root/uftm-proxmox-casas-backups"
 UFTM_CACHE_DIR="${SCRIPT_DIR}/root/uftm-proxmox-casas-cache"
-UFTM_STATE_FILE="${SCRIPT_DIR}/root/wizard-state.env"
+UFTM_STATE_FILE="${SCRIPT_DIR}/data/wizard-state.env"
 
 require_root() {
   if [[ "$(id -u)" -ne 0 ]]; then
@@ -83,7 +83,7 @@ pause_ack() {
 state_load() {
   msg_info "Verifica se o processo foi interrompido"
   if [[ ! -f "$UFTM_STATE_FILE" ]]; then
-    mkdir -p "${SCRIPT_DIR}/root"
+    mkdir -p "${SCRIPT_DIR}/data"
     touch "$UFTM_STATE_FILE"
     chmod 600 "$UFTM_STATE_FILE"
   fi
@@ -95,7 +95,7 @@ state_load() {
 # (não duplica a linha se rodar de novo) e já exporta na sessão atual.
 state_set() {
   local name="$1" value="$2"
-  mkdir -p "${SCRIPT_DIR}/root"
+  mkdir -p "${SCRIPT_DIR}/data"
   touch "$UFTM_STATE_FILE"
   chmod 600 "$UFTM_STATE_FILE"
   local esc_value
