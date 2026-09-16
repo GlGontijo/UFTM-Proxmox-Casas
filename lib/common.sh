@@ -81,7 +81,6 @@ pause_ack() {
 # arquivo -- nenhuma delas pergunta nada ao usuário diretamente.
 
 state_load() {
-  msg_info "Verifica se o processo foi interrompido"
   if [[ ! -f "$UFTM_STATE_FILE" ]]; then
     mkdir -p "${SCRIPT_DIR}/data"
     touch "$UFTM_STATE_FILE"
