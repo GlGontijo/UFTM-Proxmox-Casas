@@ -148,10 +148,10 @@ expect {
   timeout { send_user "\n[ERRO] Timeout no login pós-wizard.\n"; exit 1 }
 }
 expect "# "
-send "fetch -o /conf/config.xml '${CONFIG_URL}'\r"
-expect "# "
-send "cp /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml 2>/dev/null; echo done\r"
+send "cp -v /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml; echo done\r"
 expect "done"
+send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r"
+expect "# "
 send "/etc/rc.reboot\r"
 expect eof
 EOF
