@@ -40,18 +40,18 @@ fi
 # ═══════════════════════════════════════════════════════════════
 # 1) Host: CSV ou manual
 # ═══════════════════════════════════════════════════════════════
-if [[ -z "${UFTM_HOSTNAME:-}" ]]; then
-  if [[ ! -f "$CSV_FILE" ]]; then
-    msg_error "Arquivo CSV não encontrado: $CSV_FILE"
+if [[ "${UFTM_HOST_SET:-0}" != "1" ]]; then
+  if [[ -f "$CSV_FILE" ]]; then
+    if ! csv_validate_columns "$CSV_FILE" "$CSV_EXPECTED_COLS"; then
+      msg_error "hosts.csv com linha(s) malformada(s) (colunas != $CSV_EXPECTED_COLS):"
+      csv_validate_columns "$CSV_FILE" "$CSV_EXPECTED_COLS" >&2 || true
+      exit 1
+    fi
+  else
+    msg_error "Arquivo HOSTS.CSV não encontrado"
     echo "Copie data/hosts.csv.example para data/hosts.csv e preencha," >&2
     exit 1
   fi
-  if ! csv_validate_columns "$CSV_FILE" "$CSV_EXPECTED_COLS"; then
-    msg_error "hosts.csv com linha(s) malformada(s) (colunas != $CSV_EXPECTED_COLS):"
-    csv_validate_columns "$CSV_FILE" "$CSV_EXPECTED_COLS" >&2 || true
-    exit 1
-  fi
-fi
 
   menu_items=()
   while IFS=';' read -r host _; do
@@ -81,12 +81,14 @@ fi
   state_set UFTM_WG_TUNNEL_IP "$UFTM_WG_TUNNEL_IP"
   state_set UFTM_OPNSENSE "$UFTM_OPNSENSE"
   state_set UFTM_BKP_URL "$UFTM_BKP_URL"
+  state_set UFTM_HOST_SET "1"
   msg_ok "Host selecionado: $UFTM_HOSTNAME"
+fi
 
 # ═══════════════════════════════════════════════════════════════
 # 2) Dados sensíveis (Chave WireGuard) -- nunca vai pro CSV
 # ═══════════════════════════════════════════════════════════════
-if [[ -z "${UFTM_WG_PK_SET:-}" ]]; then
+if [[ "${UFTM_WG_PK_SET:-0}" != "1" ]]; then
   WG_MODE=$(whiptail --menu "Chave privada WireGuard:" 0 60 2 \
     "informar" "Informar chave existente (padrão)" \
     "gerar" "Gerar novo par com wg genkey" \
@@ -124,7 +126,7 @@ fi
 # ═══════════════════════════════════════════════════════════════
 # 4) Rede: WAN (DHCP/Fixo/PPPoE), LAN trunk, console opcional
 # ═══════════════════════════════════════════════════════════════
-if [[ -z "${UFTM_NET_DONE:-}" ]]; then
+if [[ "${UFTM_NET_DONE:-0}" != "1" ]]; then
   mapfile -t NIC_LIST < <(ip -o link show | awk -F': ' '{print $2}' | \
     grep -Ev '^(lo|vmbr|wg|vnet|fwbr|fwln|tap|veth|pppoe|bond)')
   if [[ "${#NIC_LIST[@]}" -eq 0 ]]; then
@@ -277,7 +279,7 @@ fi
 # 7) OPNsense: parâmetros da VM + origem do backup (SEM baixar nada
 #    ainda -- isso é feito na etapa download-deps.sh)
 # ═══════════════════════════════════════════════════════════════
-if [[ "$UFTM_OPNSENSE" =~ ^[SsYy] ]] && [[ -z "${UFTM_OPNSENSE_PARAMS_DONE:-}" ]]; then
+if [[ "$UFTM_OPNSENSE" =~ ^[SsYy] ]] && [[ "${UFTM_OPNSENSE_PARAMS_DONE:-0}" != "1" ]]; then
   OPN_STORAGE=$(whiptail --inputbox "Storage para o disco da VM OPNsense:" 0 60 "local-lvm" 3>&2 2>&1 1>&3) || exit 1
   OPN_CPU=$(whiptail --inputbox "vCPUs:" 0 50 "2" 3>&2 2>&1 1>&3) || exit 1
   OPN_RAM=$(whiptail --inputbox "RAM (MB):" 0 50 "4096" 3>&2 2>&1 1>&3) || exit 1
