@@ -82,10 +82,11 @@ pause_ack() {
 
 state_load() {
   if [[ ! -f "$UFTM_STATE_FILE" ]]; then
+    msg_info "Criando $UFTM_STATE_FILE"
     mkdir -p "${SCRIPT_DIR}/data"
     touch "$UFTM_STATE_FILE"
-    chmod 600 "$UFTM_STATE_FILE"
   fi
+  chmod 600 "$UFTM_STATE_FILE"
   source "$UFTM_STATE_FILE"
 }
 
