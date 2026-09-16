@@ -136,6 +136,7 @@ EOF
 
   if [[ -n "$CONFIG_URL" ]]; then
     msg_info "Restaurando config.xml via console serial (fetch + reboot)"
+    CONFIG_OLD="config-$(date +%Y%m%d%H%M%S)"
     expect <<EOF
 set timeout 60
 spawn qm terminal ${VMID}
@@ -149,7 +150,7 @@ expect {
 expect "# "
 send "fetch -o /conf/config.xml '${CONFIG_URL}'\r"
 expect "# "
-send "cp /conf/config.xml /conf/backup/config-\$(date +%Y%m%d%H%M%S).xml 2>/dev/null; echo done\r"
+send "cp /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml 2>/dev/null; echo done\r"
 expect "done"
 send "/etc/rc.reboot\r"
 expect eof
