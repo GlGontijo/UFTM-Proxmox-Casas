@@ -11,7 +11,8 @@ msg_ok()    { echo -e "${BFR} ${CM} ${GN}$1${CL}\n"; }
 msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}\n"; }
 msg_warn()  { echo -e " ${YW}⚠ $1${CL}\n"; }
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/.."
+LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+SCRIPT_DIR="$(cd -- "${LIB_DIR}/.." &>/dev/null && pwd)"
 UFTM_ETC_DIR="/etc/uftm-proxmox-casas"
 UFTM_BACKUP_ROOT="${SCRIPT_DIR}/root/uftm-proxmox-casas-backups"
 UFTM_CACHE_DIR="${SCRIPT_DIR}/root/uftm-proxmox-casas-cache"
