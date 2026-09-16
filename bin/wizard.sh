@@ -23,17 +23,13 @@ require_cmd whiptail
 CSV_FILE="${UFTM_CSV_FILE:-$SCRIPT_DIR/data/hosts.csv}"
 CSV_EXPECTED_COLS=5
 
-if [[ -f "$UFTM_STATE_FILE" ]]; then
-  state_load
-fi
-
 # ── Retomar? ──────────────────────────────────────────────────────
 if [[ -f "$UFTM_STATE_FILE" ]] && [[ "${UFTM_WIZARD_DONE:-0}" != "1" ]] && [[ -n "${UFTM_HOSTNAME:-}" ]]; then
   if whiptail --yesno "Encontrei uma configuração de wizard incompleta para '$UFTM_HOSTNAME'.\n\nRetomar de onde parou? (Não = começar um wizard novo do zero)" 0 0; then
+    state_load
     msg_ok "Retomando estado anterior"
   else
     rm -f "$UFTM_STATE_FILE"
-    state_load 2>/dev/null || true
   fi
 else 
   msg_ok "Primeira vez por aqui? Vamos seguir do zero então."
