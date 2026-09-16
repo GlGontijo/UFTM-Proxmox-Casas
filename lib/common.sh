@@ -11,10 +11,11 @@ msg_ok()    { echo -e "${BFR} ${CM} ${GN}$1${CL}\n"; }
 msg_error() { echo -e "${BFR} ${CROSS} ${RD}$1${CL}\n"; }
 msg_warn()  { echo -e " ${YW}⚠ $1${CL}\n"; }
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 UFTM_ETC_DIR="/etc/uftm-proxmox-casas"
-UFTM_BACKUP_ROOT="/root/uftm-proxmox-casas-backups"
-UFTM_CACHE_DIR="/root/uftm-proxmox-casas-cache"
-UFTM_STATE_FILE="$UFTM_ETC_DIR/wizard-state.env"
+UFTM_BACKUP_ROOT="${SCRIPT_DIR}/root/uftm-proxmox-casas-backups"
+UFTM_CACHE_DIR="${SCRIPT_DIR}/root/uftm-proxmox-casas-cache"
+UFTM_STATE_FILE="${SCRIPT_DIR}/root/wizard-state.env"
 
 require_root() {
   if [[ "$(id -u)" -ne 0 ]]; then
@@ -81,7 +82,12 @@ pause_ack() {
 
 state_load() {
   msg_info "Verifica se o processo foi interrompido"
-  [[ -f "$UFTM_STATE_FILE" ]] && source "$UFTM_STATE_FILE"
+  if [[ ! -f "$UFTM_STATE_FILE" ]]; then
+    mkdir -p "${SCRIPT_DIR}/root"
+    touch "$UFTM_STATE_FILE"
+    chmod 600 "$UFTM_STATE_FILE"
+  fi
+  source "$UFTM_STATE_FILE"
 }
 
 # state_set <NOME_DA_VAR> <valor>
@@ -89,7 +95,7 @@ state_load() {
 # (não duplica a linha se rodar de novo) e já exporta na sessão atual.
 state_set() {
   local name="$1" value="$2"
-  mkdir -p "$UFTM_ETC_DIR"
+  mkdir -p "${SCRIPT_DIR}/root"
   touch "$UFTM_STATE_FILE"
   chmod 600 "$UFTM_STATE_FILE"
   local esc_value
