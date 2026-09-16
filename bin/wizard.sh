@@ -23,9 +23,7 @@ require_cmd whiptail
 CSV_FILE="${UFTM_CSV_FILE:-$SCRIPT_DIR/data/hosts.csv}"
 CSV_EXPECTED_COLS=5
 
-wizard() {
-  state_load
-  
+wizard() {  
   # ═══════════════════════════════════════════════════════════════
   # 1) Host: CSV ou manual
   # ═══════════════════════════════════════════════════════════════
@@ -322,17 +320,17 @@ if [[ ! -z "${UFTM_HOSTNAME:-}" ]]; then
   else  
     rm -f "$UFTM_STATE_FILE"
     state_set UFTM_WIZARD_DONE "0" 
+    state_load
   fi
 else 
   msg_ok "Primeira vez por aqui? Vamos seguir do zero então."
   state_set UFTM_WIZARD_DONE "0"
+  state_load
 fi
 
-state_load
+wizard
 
 while [[ "${UFTM_WIZARD_DONE:-0}" != "1" ]]; do
-  wizard
-  
   # ═══════════════════════════════════════════════════════════════
   # Resumo final
   # ═══════════════════════════════════════════════════════════════
@@ -366,12 +364,14 @@ while [[ "${UFTM_WIZARD_DONE:-0}" != "1" ]]; do
       msg_ok "Wizard concluído -- prosseguindo para a próxima etapa"
       state_set UFTM_WIZARD_DONE "1"
       state_load
+      continue
       ;;
     refazer)
       msg_info "Estado apagado -- reiniciando o wizard"
       rm -f "$UFTM_STATE_FILE"
       state_set UFTM_WIZARD_DONE "0"    
       state_load
+      wizard
       ;;
     *)
       msg_error "Cancelado pelo usuário -- estado preservado em $UFTM_STATE_FILE para retomar depois"
