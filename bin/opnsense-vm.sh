@@ -71,8 +71,8 @@ if [[ "$VMID" > 0 ]]; then
     --cores "$CPU_CORES" \
     --cpu host \
     --memory "$RAM_MB" \
-    --net0 "virtio,bridge=${BRIDGE_WAN}" \
-    --net1 "virtio,bridge=${BRIDGE_LAN}" \
+    --net0 "virtio,bridge=${BRIDGE_WAN},rate=1000" \
+    --net1 "virtio,bridge=${BRIDGE_LAN},rate=1000" \
     --serial0 socket \
     --onboot 1
   msg_ok "VM $VMID criada"
