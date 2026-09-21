@@ -4,13 +4,28 @@
 # Os vnets EVPN (vnet1010, vnet1011...) são bridges Linux criados pelo SDN,
 # mas SEM uplink físico -- pra tráfego local da VLAN no switch físico chegar
 # até o fabric VXLAN, é preciso escravizar uma sub-interface 802.1Q da
-# bridge de trunk (ex: vmbr3.1010) dentro do vnet correspondente.
+# bridge de trunk (ex: vmbr2.1010) dentro do vnet correspondente.
 #
-# Duas dificuldades já mapeadas no projeto:
+# Dificuldades já mapeadas no projeto:
 #   1) ifupdown2 reconcilia os membros da bridge a cada `ifreload`, desfazendo
 #      qualquer `ip link set master` feito manualmente/fora do config declarado.
 #   2) os dispositivos vnetXXXX só são materializados pelo FRR/zebra DEPOIS
 #      que networking.service termina -- um post-up não é suficiente.
+#   3) [FIX] a sub-interface 802.1Q criada aqui via `ip link add ... type vlan`
+#      fica fora do ifupdown2 -- diferente de uma subinterface declarada em
+#      /etc/network/interfaces, ela NÃO programa sozinha a membership do VID
+#      na entrada "self" da bridge trunk vlan-aware. Sem essa entrada, a
+#      bridge flooda broadcast normalmente (por isso o ARP request passa),
+#      mas não sabe encaminhar o unicast de volta pras portas físicas (por
+#      isso a resposta do ARP morre). Corrigido abaixo com
+#      `bridge vlan add vid ... dev ... self` a cada reconciliação, e com
+#      MTU 1360 explícito pra bater com o padrão VXLAN/WireGuard do projeto.
+#   4) [FIX] antes, `reconcile()` rodava inteiro (todas as VLANs) a cada
+#      evento de `ip monitor link` do host -- inclusive tap de VM subindo/
+#      descendo sem relação nenhuma com essas VLANs. Isso gastava CPU à toa
+#      em hosts com bastante churn de VM. Agora filtra a linha do monitor
+#      pelo nome das interfaces relevantes (phys/vnet do vlan-binds.conf)
+#      antes de reconciliar, igual o script anterior (pré-wizard) já fazia.
 #
 # Solução: um serviço systemd persistente (Type=simple) que roda `ip monitor
 # link` e reconcilia os binds sempre que um vnet aparece/some ou o master é
@@ -71,6 +86,20 @@ cat >"$BIND_SCRIPT" <<'BINDEOF'
 set -u
 CONF="/etc/uftm-proxmox-casas/vlan-binds.conf"
 LOG_TAG="uftm-evpn-bind"
+SUBIF_MTU=1360
+
+# nomes relevantes (phys + vnet de cada linha do CONF) -- usados só pra
+# filtrar eventos irrelevantes do "ip monitor link" antes de reconciliar.
+# Lido uma vez no início; se o CONF ganhar VLANs novas, reinicie o serviço
+# (systemctl restart uftm-evpn-bind-vlan.service) pra recarregar a lista.
+relevant_names() {
+  [[ -f "$CONF" ]] || return
+  while read -r phys vnet vlan; do
+    [[ -z "$phys" || "$phys" == \#* ]] && continue
+    echo "$phys"
+    echo "$vnet"
+  done <"$CONF"
+}
 
 reconcile() {
   [[ -f "$CONF" ]] || { logger -t "$LOG_TAG" "config ausente: $CONF"; return; }
@@ -89,6 +118,17 @@ reconcile() {
       fi
     fi
     ip link set "$phys" up 2>/dev/null
+    ip link set "$phys" mtu "$SUBIF_MTU" 2>/dev/null
+
+    # garante membership do VID na entrada "self" da bridge trunk vlan-aware --
+    # `ip link add ... type vlan` fora do ifupdown2 não programa isso sozinho;
+    # sem essa entrada a bridge não consegue encaminhar unicast de volta pras
+    # portas físicas (broadcast passa por flood normal, unicast morre aqui).
+    # Idempotente: seguro rodar em toda reconciliação.
+    if ip link show "$local_parent" &>/dev/null; then
+      bridge vlan add vid "$vlan" dev "$local_parent" self 2>/dev/null \
+        && logger -t "$LOG_TAG" "self-vlan $vlan garantida em $local_parent"
+    fi
 
     # só escraviza quando o vnet (bridge alvo) já existe -- ele é criado
     # tardiamente pelo FRR/zebra, depois do networking.service
@@ -105,8 +145,16 @@ reconcile() {
 logger -t "$LOG_TAG" "iniciando reconciliação inicial"
 reconcile
 
-logger -t "$LOG_TAG" "monitorando eventos netlink (ip monitor link)"
-ip monitor link 2>/dev/null | while read -r _; do
+mapfile -t RELEVANT_NAMES < <(relevant_names)
+logger -t "$LOG_TAG" "monitorando eventos netlink (ip monitor link) -- filtrando por: ${RELEVANT_NAMES[*]}"
+ip monitor link 2>/dev/null | while read -r line; do
+  match=0
+  for name in "${RELEVANT_NAMES[@]}"; do
+    [[ "$line" == *"$name"* ]] || continue
+    match=1
+    break
+  done
+  [[ "$match" -eq 1 ]] || continue
   reconcile
 done
 BINDEOF
