@@ -193,8 +193,8 @@ fi
 
 # ── 5) Hooks globais (if-up/if-pre-up), NUNCA linhas dentro do interfaces ──
 # Só existem quando PPPoE está em uso; removidos (idempotente) quando não.
-WAIT_HOOK="/etc/network/99-if-pre-up.d/uftm-wait-pppoe0"
-RESTART_WG_HOOK="/etc/network/99-if-up.d/uftm-restart-sdn-wireguard"
+WAIT_HOOK="/etc/network/if-pre-up.d/99-uftm-wait-pppoe0"
+RESTART_WG_HOOK="/etc/network/if-up.d/99-uftm-restart-sdn-wireguard"
 
 rm -f "$WAIT_HOOK" "$RESTART_WG_HOOK"
 if [[ "$UFTM_WAN_MODE" == "pppoe" ]]; then
