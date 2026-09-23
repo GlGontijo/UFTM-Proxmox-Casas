@@ -37,10 +37,10 @@ agentAddress udp:161
 
 # Community SNMPv2 somente leitura, sem restrição de origem no próprio
 # daemon (aceita de qualquer host que alcance a porta 161).
-rocommunity DTI default
+rocommunity dti default
 
 sysLocation    UFTM
-sysContact     dti@uftm.edu.br
+sysContact     dit.protic@uftm.edu.br
 EOF
 systemctl enable --now snmpd
 systemctl restart snmpd
@@ -74,20 +74,23 @@ enable: 1
 
 [IPSET ipswan-uftm] # Faixas de IPs WAN da UFTM (definidas no wizard)
 
-${IPSET_LINES}
+186.248.203.208/28
+200.131.62.0/23
+
 [RULES]
 
 GROUP uftm_access # UFTM acesso remoto
 IN DHCPfwd(ACCEPT) -log info # DHCP Forward
 IN DNS(ACCEPT) -log info # DNS
-IN ACCEPT -source +sdn/vnetsnat-all -dest +sdn/vnetsnat-all -log info # SNAT Traffic
+IN ACCEPT -dest +sdn/vnetsnat-all -log info # SNAT Traffic
 IN ACCEPT -i wg0 -log info # Wireguard Interface
 
 [group uftm_access] # Regras para liberação de acesso remoto
 
-IN ACCEPT -source +dc/ipswan-uftm -p udp -dport ${UFTM_WG_PORT} -log info # Allow UFTM Access - Wireguard
+IN Ping(ACCEPT) -source +dc/ipswan-uftm -log info # Allow UFTM Access - Ping
+IN ACCEPT -source +dc/ipswan-uftm -p udp -dport 51820 -log info # Allow UFTM Access - Wireguard
 IN ACCEPT -source +dc/ipswan-uftm -p tcp -dport 8006 -log info # Allow UFTM Access - Proxmox
-IN ACCEPT -source +dc/ipswan-uftm -p udp -dport 161 -log info # Allow UFTM Access - SNMP
+IN SNMP(ACCEPT) -source +dc/ipswan-uftm -log info # Allow UFTM Access - SNMP
 IN SSH(ACCEPT) -source +dc/ipswan-uftm -log info # Allow UFTM Access - SSH
 EOF
 msg_ok "cluster.fw gravado (${UFTM_FW_ALLOWED_IPS// / , })"
