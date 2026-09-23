@@ -112,6 +112,13 @@ expect {
     exit 1
   }
 }
+EOF
+
+  msg_info "Executando configuração de IP (WAN)"
+  expect <<EOF
+set timeout 60
+spawn qm terminal ${VMID}
+send "\r"
 
 expect {
   "login:" { send "root\r"; exp_continue }
