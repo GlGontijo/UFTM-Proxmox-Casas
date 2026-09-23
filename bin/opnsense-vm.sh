@@ -105,7 +105,15 @@ expect {
   -re "Enter the WAN interface name.*" { send "vtnet0\r"; exp_continue }
   -re "Enter the LAN interface name.*" { send "vtnet1\r"; exp_continue }
   -re "Enter the Optional interface.*" { send "\r"; exp_continue }
-  -re "Do you want to proceed.*" { send "y\r"; exp_continue }
+  -re "Do you want to proceed.*" { send "y\r"}
+  "login:" { send_user {Configuracao concluida com sucesso.} } 
+  timeout {
+    send_user {[ERRO] Timeout aguardando resposta do OPNsense.}
+    exit 1
+  }
+}
+
+expect {
   "login:" { send "root\r"; exp_continue }
   "Password:" { send "opnsense\r"; exp_continue }
   "Enter an option:*" { send "2\r"; exp_continue }
@@ -122,7 +130,7 @@ expect {
   "Do you want to generate a new self-signed*" { send "y\r"; exp_continue }
   "Restore web GUI access defaults?*" { send "y\r"; exp_continue }
   "Starting web GUI...done." {
-    send_user {Configuracao concluida com sucesso.}
+    send_user {Configuracao WAN concluida com sucesso.}
   }
   timeout {
     send_user {[ERRO] Timeout aguardando resposta do OPNsense.}
@@ -130,7 +138,7 @@ expect {
   }
 }
 EOF
-  msg_ok "Wizard inicial concluído (vtnet0=WAN, vtnet1=LAN)"
+  msg_ok "Wizard inicial concluído (vtnet0=WAN, vtnet1=LAN, WAN_IP=172.31.0.2/30)"
 
   # ── 5) Restauração de config.xml (se veio em cache de download-deps.sh) ──
   # O arquivo já foi baixado/escolhido/renomeado para config.xml na etapa 3.
@@ -166,9 +174,9 @@ expect {
 expect "# "
 send "cp -v /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml; echo done\r"
 expect "done"
-send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r"
-expect "# "
-send "/etc/rc.reboot\r"
+send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r; echo 'Config OK'"
+expect "Config OK"
+send "/sbin/reboot\r"
 expect eof
 EOF
     if [[ -f /tmp/uftm-opnsense-httpserve.pid ]]; then
