@@ -105,7 +105,7 @@ expect {
   -re "Enter the WAN interface name.*" { send "vtnet0\r"; exp_continue }
   -re "Enter the LAN interface name.*" { send "vtnet1\r"; exp_continue }
   -re "Enter the Optional interface.*" { send "\r"; exp_continue }
-  -re "Do you want to proceed.*" { send "y\r"}
+  -re "Do you want to proceed.*" { send "y\r"; exp_continue }
   "login:" { send_user {Configuracao concluida com sucesso.} } 
   timeout {
     send_user {[ERRO] Timeout aguardando resposta do OPNsense.}
