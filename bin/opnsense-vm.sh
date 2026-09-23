@@ -108,9 +108,24 @@ expect {
   -re "Do you want to proceed.*" { send "y\r"; exp_continue }
   "login:" { send "root\r"; exp_continue }
   "Password:" { send "opnsense\r"; exp_continue }
-  "Enter an option:" { send "8\r" }
+  "Enter an option:*" { send "2\r"; exp_continue }
+  "Enter the number of the interface to configure:*" { send "2\r"; exp_continue }
+  "Configure IPv4 address WAN interface via DHCP?*" { send "n\r"; exp_continue }
+  "Enter the new WAN IPv4 address.*" { send "172.31.0.2\r"; exp_continue }
+  "Enter the new WAN IPv4 subnet bit count*" { send "30\r"; exp_continue }
+  "For a LAN, press <ENTER>*" { send "172.31.0.1\r"; exp_continue }
+  "Do you want to use the gateway*" { send "n\r"; exp_continue }
+  "Enter the IPv4 name server*" { send "1.1.1.1\r"; exp_continue }
+  "Configure IPv6 address WAN interface via DHCP6?*" { send "n\r"; exp_continue }
+  "Enter the new WAN IPv6 address.*" { send "\r"; exp_continue }
+  "Do you want to change the web GUI protocol*" { send "n\r"; exp_continue }
+  "Do you want to generate a new self-signed*" { send "y\r"; exp_continue }
+  "Restore web GUI access defaults?*" { send "y\r"; exp_continue }
+  "Starting web GUI...done." {
+    send_user {Configuracao concluida com sucesso.}
+  }
   timeout {
-    send_user "\n[ERRO] Timeout aguardando resposta do OPNsense.\n"
+    send_user {[ERRO] Timeout aguardando resposta do OPNsense.}
     exit 1
   }
 }
@@ -146,7 +161,7 @@ expect {
   "login:" { send "root\r"; exp_continue }
   "Password:" { send "opnsense\r"; exp_continue }
   "Enter an option:" { send "8\r" }
-  timeout { send_user "\n[ERRO] Timeout no login pós-wizard.\n"; exit 1 }
+  timeout { send_user {[ERRO] Timeout no login pós-wizard.}"; exit 1 }
 }
 expect "# "
 send "cp -v /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml; echo done\r"
