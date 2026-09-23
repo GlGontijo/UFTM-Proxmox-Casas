@@ -66,6 +66,7 @@ if [[ "$VMID" > 0 ]]; then
   msg_info "Criando VM $VMID ($VM_NAME)"
   qm create "$VMID" \
     --name "$VM_NAME" \
+    --agent 1 \
     --ostype other \
     --machine q35 \
     --cores "$CPU_CORES" \
