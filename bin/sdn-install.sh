@@ -179,7 +179,7 @@ for vlan in $SELECTED_VLANS; do
       msg_ok "vnet $vnet criado"
     else
       msg_warn "Falha ao criar vnet $vnet -- veja $PVESH_LOG"
-    tail -n 40 "$PVESH_LOG" >&2
+      tail -n 40 "$PVESH_LOG" >&2
     fi
   fi
 done
@@ -189,8 +189,7 @@ msg_info "Verificando zone de SNAT $SNAT_ZONE"
 if ! pvesh_try get "/cluster/sdn/zones/$SNAT_ZONE" >/dev/null; then
   pvesh_try create /cluster/sdn/zones -zone "$SNAT_ZONE" -type simple -ipam pve >/dev/null \
     && msg_ok "Zone $SNAT_ZONE criada" \
-    || msg_warn "Falha ao criar zone SNAT -- veja $PVESH_LOG"
-    tail -n 40 "$PVESH_LOG" >&2
+    || msg_warn "Falha ao criar zone SNAT -- veja $PVESH_LOG" && tail -n 40 "$PVESH_LOG" >&2
 else
   msg_ok "Zone $SNAT_ZONE já existe"
 fi
@@ -200,8 +199,7 @@ if ! pvesh_try get "/cluster/sdn/vnets/$SNAT_VNET" >/dev/null; then
   pvesh_try create /cluster/sdn/vnets -vnet "$SNAT_VNET" -zone "$SNAT_ZONE" \
     -alias "SNAT to VM Interfaces" >/dev/null \
     && msg_ok "vnet $SNAT_VNET criado" \
-    || msg_warn "Falha ao criar vnet SNAT -- veja $PVESH_LOG"
-    tail -n 40 "$PVESH_LOG" >&2
+    || msg_warn "Falha ao criar vnet SNAT -- veja $PVESH_LOG" && tail -n 40 "$PVESH_LOG" >&2
 else
   msg_ok "vnet $SNAT_VNET já existe"
 fi
@@ -212,8 +210,7 @@ if ! pvesh_try get "/cluster/sdn/vnets/$SNAT_VNET/subnets/$SNAT_SUBNET_ID" >/dev
   pvesh_try create "/cluster/sdn/vnets/$SNAT_VNET/subnets" \
     -subnet "$SNAT_SUBNET_CIDR" -type subnet -gateway "$SNAT_GATEWAY" -snat 1 >/dev/null \
     && msg_ok "subnet SNAT criada ($SNAT_SUBNET_CIDR, gw $SNAT_GATEWAY)" \
-    || msg_warn "Falha ao criar subnet SNAT -- veja $PVESH_LOG"
-    tail -n 40 "$PVESH_LOG" >&2
+    || msg_warn "Falha ao criar subnet SNAT -- veja $PVESH_LOG" && tail -n 40 "$PVESH_LOG" >&2
 else
   msg_ok "subnet SNAT já existe"
 fi
