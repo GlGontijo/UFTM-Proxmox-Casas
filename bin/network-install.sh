@@ -193,8 +193,8 @@ fi
 
 # ── 5) Hooks globais (if-up/if-pre-up), NUNCA linhas dentro do interfaces ──
 # Só existem quando PPPoE está em uso; removidos (idempotente) quando não.
-WAIT_HOOK="/etc/network/if-pre-up.d/uftm-wait-pppoe0"
-RESTART_WG_HOOK="/etc/network/if-up.d/uftm-restart-sdn-wireguard"
+WAIT_HOOK="/etc/network/99-if-pre-up.d/uftm-wait-pppoe0"
+RESTART_WG_HOOK="/etc/network/99-if-up.d/uftm-restart-sdn-wireguard"
 
 rm -f "$WAIT_HOOK" "$RESTART_WG_HOOK"
 if [[ "$UFTM_WAN_MODE" == "pppoe" ]]; then
@@ -233,18 +233,26 @@ TARGET_INTERFACE="pppoe0"
 WG_INTERFACE="wg0"
 [ "$IFACE" = "$TARGET_INTERFACE" ] || exit 0
 
-sleep 3
-logger -t uftm-network "pppoe0 estabelecida; reiniciando $WG_INTERFACE via engine SDN"
-ifdown $WG_INTERFACE --allow sdn >/dev/null 2>&1
-ifup $WG_INTERFACE --allow sdn >/dev/null 2>&1
+# wg0 só existe depois do sdn-install.sh -- antes disso não há o que reiniciar
+grep -qs "iface $WG_INTERFACE" /etc/network/interfaces.d/sdn || exit 0
+
+# Desacopla do ifupdown2 em execução (evita reentrância/lock) e nunca
+# propaga falha para o pppoe0
+systemd-run --no-block /bin/bash -c '
+  sleep 3
+  logger -t uftm-network "pppoe0 estabelecida; reiniciando wg0 via engine SDN"
+  ifdown wg0 --allow sdn
+  ifup wg0 --allow sdn
+' >/dev/null 2>&1
+exit 0
 EOF
   chmod 0755 "$RESTART_WG_HOOK"
   msg_ok "Hook if-up instalado: $RESTART_WG_HOOK (reinicia wg0 quando pppoe0 sobe)"
 fi
 
 # ── DNAT 443 -> OPNsense (172.31.0.2) na WAN e no console ─────────
-DNAT_UP="/etc/network/if-up.d/uftm-dnat-opnsense"
-DNAT_DOWN="/etc/network/if-post-down.d/uftm-dnat-opnsense"
+DNAT_UP="/etc/network/if-up.d/99-uftm-dnat-opnsense"
+DNAT_DOWN="/etc/network/if-post-down.d/99-uftm-dnat-opnsense"
 OPN_IP="172.31.0.2"
 rm -f "$DNAT_UP" "$DNAT_DOWN" \
       /etc/network/if-up.d/uftm-dnat-openvpn \
