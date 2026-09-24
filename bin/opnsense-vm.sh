@@ -147,36 +147,6 @@ expect {
 EOF
   msg_ok "Wizard inicial concluído (vtnet0=WAN, vtnet1=LAN, WAN_IP=172.31.0.2/30)"
 
-  msg_info "Criando regra de snat para a ${BRIDGE_WAN}"
-  SNAT_UP="/etc/network/if-up.d/99-uftm-snat-opnsense"
-  SNAT_DOWN="/etc/network/if-post-down.d/99-uftm-snat-opnsense"
-  rm -f "$SNAT_UP" "$SNAT_DOWN"
-
-  cat >"$SNATUP" <<'EOF'
-#!/bin/bash
-# /etc/network/if-up.d/uftm-snat-vnetsnat
-
-[ "\$IFACE" = "vnetsnat" ] || exit 0
-SUBNET="172.31.0.0/30"
-
-iptables -t nat -C POSTROUTING -s "\$SUBNET" ! -o vnetsnat -j MASQUERADE 2>/dev/null \
-  || iptables -t nat -A POSTROUTING -s "\$SUBNET" ! -o vnetsnat -j MASQUERADE
-logger -t uftm-network "SNAT "\$SUBNET" -> "\$IFACE" garantido"
-exit 0
-  EOF
-  
-  cat >"$SNATUP" <<'EOF'
-#!/bin/bash
-# /etc/network/if-up.d/uftm-snat-vnetsnat
-
-[ "\$IFACE" = "vnetsnat" ] || exit 0
-SUBNET="172.31.0.0/30"
-
-iptables -t nat -D POSTROUTING -s "\$SUBNET" ! -o vnetsnat -j MASQUERADE
-logger -t uftm-network "SNAT "\$SUBNET" -> "\$IFACE" removido"
-exit 0
-  EOF
-  
   # ── 5) Restauração de config.xml (se veio em cache de download-deps.sh) ──
   # O arquivo já foi baixado/escolhido/renomeado para config.xml na etapa 3.
   # Aqui só aplicamos o MSS clamping (1320) nas interfaces com MTU 1360 e
@@ -222,6 +192,38 @@ EOF
     msg_ok "Instalação limpa (sem restauração de config.xml) -- WAN/LAN ficam com DHCP padrão do wizard, ajuste depois pela GUI."
   fi
 
+  msg_info "Criando regra de snat para a ${BRIDGE_WAN}"
+  SNAT_UP="/etc/network/if-up.d/99-uftm-snat-opnsense"
+  SNAT_DOWN="/etc/network/if-post-down.d/99-uftm-snat-opnsense"
+  rm -f "$SNAT_UP" "$SNAT_DOWN"
+
+  cat >"$SNAT_UP" <<'EOF'
+#!/bin/bash
+# /etc/network/if-up.d/uftm-snat-vnetsnat
+TARGET_IFACE="$BRIDGE_WAN"
+
+[ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
+SUBNET="172.31.0.0/30"
+
+iptables -t nat -C POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE 2>/dev/null \
+  || iptables -t nat -A POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE
+logger -t uftm-network "SNAT "\$SUBNET" -> "\$TARGET_IFACE" garantido"
+exit 0
+EOF
+  
+  cat >"$SNAT_DOWN" <<'EOF'
+#!/bin/bash
+# /etc/network/if-post-down.d/uftm-snat-vnetsnat
+TARGET_IFACE="$BRIDGE_WAN"
+
+[ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
+SUBNET="172.31.0.0/30"
+
+iptables -t nat -D POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE
+logger -t uftm-network "SNAT "\$SUBNET" -> "\$TARGET_IFACE" removido"
+exit 0
+EOF
+  
   state_set UFTM_OPN_VMID "$VMID"
   state_mark_step "opnsense-vm"
   msg_ok "opnsense-vm.sh concluído (VM $VMID / $VM_NAME)"
