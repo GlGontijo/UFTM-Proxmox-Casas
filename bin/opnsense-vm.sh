@@ -147,6 +147,36 @@ expect {
 EOF
   msg_ok "Wizard inicial concluído (vtnet0=WAN, vtnet1=LAN, WAN_IP=172.31.0.2/30)"
 
+  msg_info "Criando regra de snat para a ${BRIDGE_WAN}"
+  SNAT_UP="/etc/network/if-up.d/99-uftm-snat-opnsense"
+  SNAT_DOWN="/etc/network/if-post-down.d/99-uftm-snat-opnsense"
+  rm -f "$SNAT_UP" "$SNAT_DOWN"
+
+  cat >"$SNATUP" <<'EOF'
+#!/bin/bash
+# /etc/network/if-up.d/uftm-snat-vnetsnat
+
+[ "\$IFACE" = "vnetsnat" ] || exit 0
+SUBNET="172.31.0.0/30"
+
+iptables -t nat -C POSTROUTING -s "\$SUBNET" ! -o vnetsnat -j MASQUERADE 2>/dev/null \
+  || iptables -t nat -A POSTROUTING -s "\$SUBNET" ! -o vnetsnat -j MASQUERADE
+logger -t uftm-network "SNAT "\$SUBNET" -> "\$IFACE" garantido"
+exit 0
+  EOF
+  
+  cat >"$SNATUP" <<'EOF'
+#!/bin/bash
+# /etc/network/if-up.d/uftm-snat-vnetsnat
+
+[ "\$IFACE" = "vnetsnat" ] || exit 0
+SUBNET="172.31.0.0/30"
+
+iptables -t nat -D POSTROUTING -s "\$SUBNET" ! -o vnetsnat -j MASQUERADE
+logger -t uftm-network "SNAT "\$SUBNET" -> "\$IFACE" removido"
+exit 0
+  EOF
+  
   # ── 5) Restauração de config.xml (se veio em cache de download-deps.sh) ──
   # O arquivo já foi baixado/escolhido/renomeado para config.xml na etapa 3.
   # Aqui só aplicamos o MSS clamping (1320) nas interfaces com MTU 1360 e
@@ -172,16 +202,12 @@ EOF
 set timeout 60
 spawn qm terminal ${VMID}
 send "\r"
-expect {
-  "login:" { send "root\r"; exp_continue }
-  "Password:" { send "opnsense\r"; exp_continue }
-  "Enter an option:" { send "8\r" }
-  timeout { send_user {[ERRO] Timeout no login pós-wizard.}"; exit 1 }
-}
+expect "Enter an option:" 
+send "8\r"
 expect "# "
 send "cp -v /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml; echo done\r"
 expect "done"
-send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r; echo 'Config OK'"
+send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r; echo 'Config OK'\r"
 expect "Config OK"
 send "/sbin/reboot\r"
 expect eof
