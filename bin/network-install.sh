@@ -250,5 +250,14 @@ EOF
   msg_ok "Hook if-up instalado: $RESTART_WG_HOOK (reinicia wg0 quando pppoe0 sobe)"
 fi
 
+# Ajusta globalmente o IP_FORWARD
+msg_info "Criando regra de ajuste global do IPv4 Forward"
+cat >/etc/sysctl.d/99-uftm-ipforward.conf <<'EOF'
+net.ipv4.ip_forward = 1
+net.ipv4.conf.default.forwarding = 1
+net.ipv4.conf.all.forwarding = 1
+EOF
+msg_ok "IPv4 Formard ajustado para todas as interfaces. Aplique sempre com 'sysctl --system'"
+
 state_mark_step "network-install"
 msg_ok "network-install.sh concluído -- a aplicação de fato acontece no restart de rede da etapa 5 (hostname-and-restart.sh)."
