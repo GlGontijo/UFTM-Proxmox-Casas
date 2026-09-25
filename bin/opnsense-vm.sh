@@ -113,7 +113,8 @@ expect {
   }
 }
 EOF
-
+   msg_ok "Wizard inicial concluído (vtnet0=WAN, vtnet1=LAN)"
+  
   msg_info "Executando configuração de IP (WAN)"
   expect <<EOF
 set timeout 60
@@ -145,12 +146,11 @@ expect {
   }
 }
 EOF
-  msg_ok "Wizard inicial concluído (vtnet0=WAN, vtnet1=LAN, WAN_IP=172.31.0.2/30)"
+  msg_ok "Configuração WAN padrão concluída (WAN_IP=172.31.0.2/30)"
 
   # ── 5) Restauração de config.xml (se veio em cache de download-deps.sh) ──
   # O arquivo já foi baixado/escolhido/renomeado para config.xml na etapa 3.
-  # Aqui só aplicamos o MSS clamping (1320) nas interfaces com MTU 1360 e
-  # entregamos via HTTP efêmero na bridge de SNAT para a VM buscar com
+  # Aqui só entregamos via HTTP efêmero na bridge de SNAT para a VM buscar com
   # `fetch` de dentro do próprio OPNsense (evita montar UFS pelo lado Linux).
   CONFIG_URL=""
   if [[ -n "${UFTM_OPN_CONFIG_XML_PATH:-}" && -f "$UFTM_OPN_CONFIG_XML_PATH" ]]; then
@@ -192,37 +192,112 @@ EOF
     msg_ok "Instalação limpa (sem restauração de config.xml) -- WAN/LAN ficam com DHCP padrão do wizard, ajuste depois pela GUI."
   fi
 
-  msg_info "Criando regra de snat para a ${BRIDGE_WAN}"
-  SNAT_UP="/etc/network/if-up.d/99-uftm-snat-opnsense"
-  SNAT_DOWN="/etc/network/if-post-down.d/99-uftm-snat-opnsense"
-  rm -f "$SNAT_UP" "$SNAT_DOWN"
+  # ── 6) MASQUERADE para acesso da VM à internet e DNAT para acesso externo à VM
+  msg_info "Criando regra de masquerade para a ${BRIDGE_WAN} no OPNsense"
+  MASQ_UP="/etc/network/if-up.d/99-uftm-masquerade-opnsense"
+  MASQ_DOWN="/etc/network/if-post-down.d/99-uftm-masquerade-opnsense"
+  rm -f "$MASQ_UP" "$MASQ_DOWN"
 
-  cat >"$SNAT_UP" <<'EOF'
+  cat >"$MASQ_UP" <<EOF
 #!/bin/bash
-# /etc/network/if-up.d/uftm-snat-vnetsnat
-TARGET_IFACE="$BRIDGE_WAN"
+# /etc/network/if-up.d/uftm-masquerade-opnsense
+# Gerado por opnsense-vm.sh --- MASQUERADE OPNsense
+
+TARGET_IFACE="${BRIDGE_WAN}"
+SUBNET="172.31.0.0/30"
 
 [ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
-SUBNET="172.31.0.0/30"
 
 iptables -t nat -C POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE 2>/dev/null \
   || iptables -t nat -A POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE
-logger -t uftm-network "SNAT "\$SUBNET" -> "\$TARGET_IFACE" garantido"
+logger -t uftm-network "MASQUERADE "\$SUBNET" -> "\$TARGET_IFACE" garantido"
+
 exit 0
 EOF
   
-  cat >"$SNAT_DOWN" <<'EOF'
+  cat >"$MASQ_DOWN" <<EOF
 #!/bin/bash
 # /etc/network/if-post-down.d/uftm-snat-vnetsnat
-TARGET_IFACE="$BRIDGE_WAN"
+# Gerado por opnsense-vm.sh --- MASQUERADE OPNsense
 
-[ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
+TARGET_IFACE="${BRIDGE_WAN}"
 SUBNET="172.31.0.0/30"
 
+[ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
+
 iptables -t nat -D POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE
-logger -t uftm-network "SNAT "\$SUBNET" -> "\$TARGET_IFACE" removido"
+logger -t uftm-network "MASQUERADE "\$SUBNET" -> "\$TARGET_IFACE" removido"
+
 exit 0
 EOF
+
+  chmod 0755 "$MASQ_UP" "$MASQ_DOWN"
+  msg_ok "Hooks Masquerade $BRIDGE_WAN -> OPNsense instalados (Necessários para acesso da VM à internet)"
+
+  # ── DNAT 443 -> OPNsense (172.31.0.2) na WAN e no console ─────────
+  msg_info "Criando regra de DNAT 80/443 para o OPNsense (Para acesso direto)"
+  DNAT_UP="/etc/network/if-up.d/99-uftm-dnat-opnsense"
+  DNAT_DOWN="/etc/network/if-post-down.d/99-uftm-dnat-opnsense"
+  OPN_IP="172.31.0.2"
+  rm -f "$DNAT_UP" "$DNAT_DOWN" 
+
+  WAN_IF="$UFTM_WAN_BRIDGE"
+  [[ "$UFTM_WAN_MODE" == "pppoe" ]] && WAN_IF="pppoe0"
+
+  # "interface origem" -- WAN só para as faixas autorizadas; console aberto
+  ENTRIES=()
+  for src in $UFTM_FW_ALLOWED_IPS; do ENTRIES+=("$WAN_IF $src"); done
+  [[ -n "${UFTM_CONSOLE_BRIDGE:-}" ]] && ENTRIES+=("$UFTM_CONSOLE_BRIDGE $UFTM_CONSOLE_CIDR")
+
+  gen_entries() {
+    echo 'ENTRIES=('
+    for e in "${ENTRIES[@]}"; do printf '  "%s"\n' "$e"; done
+    echo ')'
+    echo "OPN_IP=\"$OPN_IP\""
+  }
+
+  {
+    echo '#!/bin/bash'
+    echo '# Gerado por opnsense-vm.sh -- DNAT 80/443 -> OPNsense'
+    gen_entries
+    cat <<'EOF'
+for e in "${ENTRIES[@]}"; do
+  read -r i src <<<"$e"
+  [ "$IFACE" = "$i" ] || continue
+  RULE80=(PREROUTING -i "$i" -s "$src" -p tcp --dport 80 -j DNAT --to-destination "$OPN_IP:80")
+  iptables -t nat -C "${RULE80[@]}" 2>/dev/null || iptables -t nat -A "${RULE80[@]}"
+  logger -t uftm-network "DNAT 80 $i ($src) -> $OPN_IP garantido"
+  
+  RULE443=(PREROUTING -i "$i" -s "$src" -p tcp --dport 443 -j DNAT --to-destination "$OPN_IP:443")
+  iptables -t nat -C "${RULE443[@]}" 2>/dev/null || iptables -t nat -A "${RULE443[@]}"
+  logger -t uftm-network "DNAT 443 $i ($src) -> $OPN_IP garantido"
+done
+
+exit 0
+EOF
+  } >"$DNAT_UP"
+
+  {
+    echo '#!/bin/bash'
+    echo '# Gerado por opnsense-vm.sh -- remove DNAT 80/443 -> OPNsense'
+    gen_entries
+    cat <<'EOF'
+for e in "${ENTRIES[@]}"; do
+  read -r i src <<<"$e"
+  [ "$IFACE" = "$i" ] || continue
+  RULE80=(PREROUTING -i "$i" -s "$src" -p tcp --dport 80 -j DNAT --to-destination "$OPN_IP:80")
+  while iptables -t nat -C "${RULE80[@]}" 2>/dev/null; do iptables -t nat -D "${RULE80[@]}"; done
+  
+  RULE443=(PREROUTING -i "$i" -s "$src" -p tcp --dport 443 -j DNAT --to-destination "$OPN_IP:443")
+  while iptables -t nat -C "${RULE443[@]}" 2>/dev/null; do iptables -t nat -D "${RULE443[@]}"; done
+done
+
+exit 0
+EOF
+  } >"$DNAT_DOWN"
+
+  chmod 0755 "$DNAT_UP" "$DNAT_DOWN"
+  msg_ok "Hooks DNAT 80/443 -> OPNsense instalados (WAN: $WAN_IF${UFTM_CONSOLE_BRIDGE:+, console: $UFTM_CONSOLE_BRIDGE})"
   
   state_set UFTM_OPN_VMID "$VMID"
   state_mark_step "opnsense-vm"
