@@ -85,7 +85,7 @@ else
     msg_ok "Fabric $FABRIC_ID criado via pvesh"
   else
     msg_warn "pvesh falhou ao criar o fabric -- veja $PVESH_LOG"
-    tail -n 40 "$PVESH_LOG" >&2
+    tail -n 4 "$PVESH_LOG" >&2
   fi
 fi
 
@@ -101,7 +101,7 @@ if pvesh_try create "$NODE_COLLECTION" \
   msg_ok "Nó hub registrado"
 else
   msg_warn "pvesh falhou ao registrar o nó hub -- veja $PVESH_LOG"
-  tail -n 40 "$PVESH_LOG" >&2
+  tail -n 4 "$PVESH_LOG" >&2
 fi
 
 NODE_ID="${FABRIC_ID}_${UFTM_HOSTNAME_FINAL}"
@@ -115,7 +115,7 @@ if pvesh_try create "$NODE_COLLECTION" \
   msg_ok "Nó spoke registrado"
 else
   msg_warn "pvesh falhou ao registrar o nó spoke -- veja $PVESH_LOG"
-  tail -n 40 "$PVESH_LOG" >&2
+  tail -n 4 "$PVESH_LOG" >&2
 fi
 
 
@@ -144,7 +144,7 @@ else
     msg_ok "Controller $EVPN_CONTROLLER criado"
   else
     msg_warn "Falha ao criar controller -- veja $PVESH_LOG"
-    tail -n 40 "$PVESH_LOG" >&2
+    tail -n 4 "$PVESH_LOG" >&2
   fi
 fi
 
@@ -159,7 +159,7 @@ else
     msg_ok "Zone $EVPN_ZONE criada (MTU $EVPN_ZONE_MTU)"
   else
     msg_warn "Falha ao criar zone EVPN -- veja $PVESH_LOG"
-    tail -n 40 "$PVESH_LOG" >&2
+    tail -n 4 "$PVESH_LOG" >&2
   fi
 fi
 
@@ -179,7 +179,7 @@ for vlan in $SELECTED_VLANS; do
       msg_ok "vnet $vnet criado"
     else
       msg_warn "Falha ao criar vnet $vnet -- veja $PVESH_LOG"
-      tail -n 40 "$PVESH_LOG" >&2
+      tail -n 4 "$PVESH_LOG" >&2
     fi
   fi
 done
