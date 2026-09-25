@@ -136,9 +136,7 @@ expect {
   "Enter the new WAN IPv6 address.*" { send "\r"; exp_continue }
   "Do you want to change the web GUI protocol*" { send "n\r"; exp_continue }
   "Do you want to generate a new self-signed*" { send "y\r"; exp_continue }
-  "Restore web GUI access defaults?*" { send "y\r"; exp_continue }
-  "Starting web GUI...done." {
-    send_user {Configuracao WAN concluida com sucesso.}
+  "Restore web GUI access defaults?*" { send "y\r" }
   }
   timeout {
     send_user {[ERRO] Timeout aguardando resposta do OPNsense.}
