@@ -31,6 +31,7 @@ RAM_MB="${UFTM_OPN_RAM:-4096}"
 DISK_SIZE="${UFTM_OPN_DISK:-200G}"
 OPNSENSE_VER="${UFTM_OPN_VER:-26.7}"
 IMG_PATH="$UFTM_OPN_IMG_PATH"
+OPN_CONFIG_XML_PATH="$UFTM_OPN_BKP_URL"
 
 # ── Nome da VM a partir do hostname do Proxmox ──────────────────
 PROXMOX_HOST="${UFTM_HOSTNAME:-$(hostname -s)}"
