@@ -90,8 +90,8 @@ if [[ "$VMID" > 0 ]]; then
   # ── 3) Boot inicial ────────────────────────────────────────────────
   msg_info "Ligando a VM para automação do primeiro boot"
   qm start "$VMID"
-  msg_ok "VM iniciada -- aguardando ~40s o boot do FreeBSD"
-  sleep 40
+  msg_ok "VM iniciada -- aguardando ~30s o boot do FreeBSD"
+  sleep 30
 
   # ── 4) Automação via expect: wizard inicial ───────
   msg_info "Executando automação do console serial (wizard)"
@@ -149,25 +149,37 @@ EOF
   # ── 5) Restauração de config.xml (se veio em cache de download-deps.sh) ──
   # O arquivo já foi baixado/escolhido/renomeado para config.xml na etapa 3.
   # Aqui só entregamos via HTTP efêmero na bridge de SNAT para a VM buscar com
-  # `fetch` de dentro do próprio OPNsense (evita montar UFS pelo lado Linux).
-  CONFIG_URL=""
+  # `fetch` de dentro do próprio OPNsense (evita montar UFS pelo lado Linux).  
   if [[ -n "${OPN_CONFIG_XML_PATH:-}" && -f "$OPN_CONFIG_XML_PATH" ]]; then
-    CONFIG_LOCAL="$OPN_CONFIG_XML_PATH"
 
+    msg_info "Validando o arquivo config.xml via Python3"
+    if ! python3 -c 'import sys, xml.dom.minidom as m; m.parse(sys.argv[1])' "$OPN_CONFIG_XML_PATH"; then
+      msg_error "config.xml inválido -- seguindo com instalação limpa"
+      OPN_CONFIG_XML_PATH=""
+      sleep 3
+    else
+      msg_ok "Arquivo $OPN_CONFIG_XML_PATH validado -- seguindo com restauração da VM OPNsense"
+    fi
+  else
+    OPN_CONFIG_XML_PATH="" 
+  fi
+    
+  CONFIG_LOCAL="$OPN_CONFIG_XML_PATH"
+  CONFIG_URL=""
+    
+  if [[ -n "$CONFIG_LOCAL" ]]; then
     SERVE_DIR=$(mktemp -d)
-    cp "$CONFIG_LOCAL" "$SERVE_DIR/config.xml"
+    cp -fv "$CONFIG_LOCAL" "$SERVE_DIR/config.xml"
     SERVE_PORT=8879
     ( cd "$SERVE_DIR" && python3 -m http.server "$SERVE_PORT" --bind 172.31.0.1 &>/tmp/uftm-opnsense-httpserve.log & echo $! >/tmp/uftm-opnsense-httpserve.pid )
     sleep 1
     CONFIG_URL="http://172.31.0.1:${SERVE_PORT}/config.xml"
     msg_ok "Servindo config.xml (já ajustado) temporariamente em $CONFIG_URL"
-  fi
-
-  if [[ -n "$CONFIG_URL" ]]; then
+      
     msg_info "Restaurando config.xml via console serial (fetch + reboot)"
     
     # pve-firewall precisa estar inativo para evitar bloqueio de acesso
-    pve-firewall stop
+    pve-firewall stop 2>/dev/null
     
     CONFIG_OLD="config-$(date +%Y%m%d%H%M%S)"
     expect <<EOF
@@ -175,11 +187,13 @@ set timeout 60
 spawn qm terminal ${VMID}
 send "\r"
 
-expect  {
-  "Enter an option:" { send "8\r"; exp_continue }
-  "# " { send "cp -v /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml; echo done\r"; exp_continue }
-  "done" { send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r; echo 'Config OK'\r"; exp_continue }
-  "Config OK" { send "/sbin/reboot\r"; exp_continue }
+expect  "Enter an option:" 
+send "8\r"
+expect  "# " 
+send "cp -v /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml && echo cp_done\r"
+expect {
+  "cp_done" { send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r; echo 'fetch_done'\r"; exp_continue }
+  "fetch_done" { send "/sbin/reboot\r"; exp_continue }
   "login:*" { send_user {Importação de config.xml concluida com sucesso.} } 
   timeout {
     send_user {[ERRO] Timeout aguardando resposta do OPNsense.}
@@ -196,7 +210,7 @@ EOF
   else
     msg_ok "Instalação limpa (sem restauração de config.xml) -- WAN/LAN ficam com DHCP padrão do wizard, ajuste depois pela GUI."
   fi
-
+  
   # ── 6) MASQUERADE para acesso da VM à internet e DNAT para acesso externo à VM
   msg_info "Criando regra de masquerade para a ${BRIDGE_SNAT} no OPNsense"
   MASQ_UP="/etc/network/if-up.d/99-uftm-masquerade-opnsense"
@@ -303,7 +317,7 @@ EOF
 
   chmod 0755 "$DNAT_UP" "$DNAT_DOWN"
   msg_ok "Hooks DNAT 80/443 -> OPNsense instalados (WAN: $WAN_IF${UFTM_CONSOLE_BRIDGE:+, console: $UFTM_CONSOLE_BRIDGE})"
-  
+
   state_set UFTM_OPN_VMID "$VMID"
   state_mark_step "opnsense-vm"
   msg_ok "opnsense-vm.sh concluído (VM $VMID / $VM_NAME)"
