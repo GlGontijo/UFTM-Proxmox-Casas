@@ -152,8 +152,8 @@ EOF
   # Aqui só entregamos via HTTP efêmero na bridge de SNAT para a VM buscar com
   # `fetch` de dentro do próprio OPNsense (evita montar UFS pelo lado Linux).
   CONFIG_URL=""
-  if [[ -n "${UFTM_OPN_CONFIG_XML_PATH:-}" && -f "$UFTM_OPN_CONFIG_XML_PATH" ]]; then
-    CONFIG_LOCAL="$UFTM_OPN_CONFIG_XML_PATH"
+  if [[ -n "${OPN_CONFIG_XML_PATH:-}" && -f "$OPN_CONFIG_XML_PATH" ]]; then
+    CONFIG_LOCAL="$OPN_CONFIG_XML_PATH"
 
     SERVE_DIR=$(mktemp -d)
     cp "$CONFIG_LOCAL" "$SERVE_DIR/config.xml"
