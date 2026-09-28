@@ -165,20 +165,27 @@ EOF
 
   if [[ -n "$CONFIG_URL" ]]; then
     msg_info "Restaurando config.xml via console serial (fetch + reboot)"
+    
+    # pve-firewall precisa estar inativo para evitar bloqueio de acesso
+    pve-firewall stop
+    
     CONFIG_OLD="config-$(date +%Y%m%d%H%M%S)"
     expect <<EOF
 set timeout 60
 spawn qm terminal ${VMID}
 send "\r"
-expect "Enter an option:" 
-send "8\r"
-expect "# "
-send "cp -v /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml; echo done\r"
-expect "done"
-send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r; echo 'Config OK'\r"
-expect "Config OK"
-send "/sbin/reboot\r"
-expect eof
+
+expect  {
+  "Enter an option:" { send "8\r"; exp_continue }
+  "# " { send "cp -v /conf/config.xml /conf/backup/'${CONFIG_OLD}.xml; echo done\r"; exp_continue }
+  "done" { send "fetch -v -o /conf/config.xml '${CONFIG_URL}'\r; echo 'Config OK'\r"; exp_continue }
+  "Config OK" { send "/sbin/reboot\r"; exp_continue }
+  "login:*" { send_user {Importação de config.xml concluida com sucesso.} } 
+  timeout {
+    send_user {[ERRO] Timeout aguardando resposta do OPNsense.}
+    exit 1
+  }
+}
 EOF
     if [[ -f /tmp/uftm-opnsense-httpserve.pid ]]; then
       kill "$(cat /tmp/uftm-opnsense-httpserve.pid)" 2>/dev/null || true
