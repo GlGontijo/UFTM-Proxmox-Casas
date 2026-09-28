@@ -24,14 +24,14 @@ state_load
 : "${UFTM_OPN_IMG_PATH:?Imagem OPNsense não está em cache -- rode bin/download-deps.sh (etapa 3) antes}"
 
 STORAGE="${UFTM_OPN_STORAGE:-local-lvm}"
-BRIDGE_WAN="vnetsnat"
+BRIDGE_SNAT="vnetsnat"
 BRIDGE_LAN="$UFTM_LAN_BRIDGE"
 CPU_CORES="${UFTM_OPN_CPU:-2}"
 RAM_MB="${UFTM_OPN_RAM:-4096}"
 DISK_SIZE="${UFTM_OPN_DISK:-200G}"
 OPNSENSE_VER="${UFTM_OPN_VER:-26.7}"
 IMG_PATH="$UFTM_OPN_IMG_PATH"
-OPN_CONFIG_XML_PATH="$UFTM_OPN_BKP_URL"
+OPN_CONFIG_XML_PATH="${UFTM_OPN_CONFIG_XML_PATH:-}"
 
 # ── Nome da VM a partir do hostname do Proxmox ──────────────────
 PROXMOX_HOST="${UFTM_HOSTNAME:-$(hostname -s)}"
@@ -61,7 +61,7 @@ while qm status "$VMID" &>/dev/null; do
 done
 
 if [[ "$VMID" > 0 ]]; then
-  msg_ok "VM: $VM_NAME (ID $VMID) -- net0=$BRIDGE_WAN/WAN, net1=$BRIDGE_LAN/LAN-trunk, ${CPU_CORES}vCPU/${RAM_MB}MB/${DISK_SIZE}, OPNsense $OPNSENSE_VER"
+  msg_ok "VM: $VM_NAME (ID $VMID) -- net0=$BRIDGE_SNAT/WAN, net1=$BRIDGE_LAN/LAN-trunk, ${CPU_CORES}vCPU/${RAM_MB}MB/${DISK_SIZE}, OPNsense $OPNSENSE_VER"
 
   # ── 1) Criação da VM ──────────────────────────────────────────────
   msg_info "Criando VM $VMID ($VM_NAME)"
@@ -73,7 +73,7 @@ if [[ "$VMID" > 0 ]]; then
     --cores "$CPU_CORES" \
     --cpu host \
     --memory "$RAM_MB" \
-    --net0 "virtio,bridge=${BRIDGE_WAN},rate=1000" \
+    --net0 "virtio,bridge=${BRIDGE_SNAT},rate=1000" \
     --net1 "virtio,bridge=${BRIDGE_LAN},rate=1000" \
     --serial0 socket \
     --onboot 1
@@ -192,7 +192,7 @@ EOF
   fi
 
   # ── 6) MASQUERADE para acesso da VM à internet e DNAT para acesso externo à VM
-  msg_info "Criando regra de masquerade para a ${BRIDGE_WAN} no OPNsense"
+  msg_info "Criando regra de masquerade para a ${BRIDGE_SNAT} no OPNsense"
   MASQ_UP="/etc/network/if-up.d/99-uftm-masquerade-opnsense"
   MASQ_DOWN="/etc/network/if-post-down.d/99-uftm-masquerade-opnsense"
   rm -f "$MASQ_UP" "$MASQ_DOWN"
@@ -202,7 +202,7 @@ EOF
 # /etc/network/if-up.d/uftm-masquerade-opnsense
 # Gerado por opnsense-vm.sh --- MASQUERADE OPNsense
 
-TARGET_IFACE="${BRIDGE_WAN}"
+TARGET_IFACE="${BRIDGE_SNAT}"
 SUBNET="172.31.0.0/30"
 
 [ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
@@ -219,7 +219,7 @@ EOF
 # /etc/network/if-post-down.d/uftm-snat-vnetsnat
 # Gerado por opnsense-vm.sh --- MASQUERADE OPNsense
 
-TARGET_IFACE="${BRIDGE_WAN}"
+TARGET_IFACE="${BRIDGE_SNAT}"
 SUBNET="172.31.0.0/30"
 
 [ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
@@ -231,7 +231,7 @@ exit 0
 EOF
 
   chmod 0755 "$MASQ_UP" "$MASQ_DOWN"
-  msg_ok "Hooks Masquerade $BRIDGE_WAN -> OPNsense instalados (Necessários para acesso da VM à internet)"
+  msg_ok "Hooks Masquerade $BRIDGE_SNAT -> OPNsense instalados (Necessários para acesso da VM à internet)"
 
   # ── DNAT 443 -> OPNsense (172.31.0.2) na WAN e no console ─────────
   msg_info "Criando regra de DNAT 80/443 para o OPNsense (Para acesso direto)"
