@@ -152,9 +152,11 @@ EOF
   # `fetch` de dentro do próprio OPNsense (evita montar UFS pelo lado Linux).  
   if [[ -n "${OPN_CONFIG_XML_PATH:-}" && -f "$OPN_CONFIG_XML_PATH" ]]; then
 
-    msg_info "Validando o arquivo config.xml via Python3"
-    if ! python3 -c 'import sys, xml.dom.minidom as m; m.parse(sys.argv[1])' "$OPN_CONFIG_XML_PATH"; then
-      msg_error "config.xml inválido -- seguindo com instalação limpa"
+    XML_ERR_LOG="/tmp/uftm-config-xml-validate.log"
+    if ! python3 -c 'import sys, xml.dom.minidom as m; m.parse(sys.argv[1])' \
+      "$OPN_CONFIG_XML_PATH" 2>"$XML_ERR_LOG"; then
+      msg_error "config.xml inválido ($OPN_CONFIG_XML_PATH): $(tail -n 1 "$XML_ERR_LOG")"
+      msg_warn "Restauração ignorada -- a VM segue com instalação limpa. Corrija o arquivo e restaure depois pela GUI (System > Configuration > Backups)."
       OPN_CONFIG_XML_PATH=""
       sleep 3
     else
@@ -163,7 +165,7 @@ EOF
   else
     OPN_CONFIG_XML_PATH="" 
   fi
-    
+  
   CONFIG_LOCAL="$OPN_CONFIG_XML_PATH"
   CONFIG_URL=""
     
