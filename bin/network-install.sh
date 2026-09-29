@@ -152,6 +152,7 @@ if [[ "$UFTM_WAN_MODE" == "pppoe" ]]; then
 auto pppoe0
 iface pppoe0 inet ppp
     provider $PEER_NAME
+    mtu ${UFTM_PPPOE_MTU:-1492}
 EOF
   msg_ok "pppoe0 gravado em $PPPOE_IFACE_FILE (arquivo exclusivo)"
 
