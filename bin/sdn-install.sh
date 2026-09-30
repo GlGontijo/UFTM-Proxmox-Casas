@@ -71,7 +71,7 @@ api_apply() {
   fi
 }
 
-WG_PUBKEY="${$UFTM_WG_PK}"
+WG_PUBKEY="${UFTM_WG_PK}"
 msg_ok "Chave pública derivada: $WG_PUBKEY"
 
 # ── 1) Fabric WireGuard ─────────────────────────────────────────
