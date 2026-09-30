@@ -2,4 +2,11 @@ Host;WG_Port;WG_TunnelIP;OPNsense;URL_BKPRepo
 pve-ceppa;51820;10.255.255.2;s;https://backups.uftm.edu.br/opnsense/ceppa/config.xml
 pve-dass;51820;10.255.255.3;s;https://backups.uftm.edu.br/opnsense/dass/config.xml
 pve-dase;51820;10.255.255.4;s;https://backups.uftm.edu.br/opnsense/diaes/config.xml
+pve-lacea;51820;10.255.255.5;s;https://backups.uftm.edu.br/opnsense/lacea/config.xml
+pve-tutunas;51820;10.255.255.6;s;https://backups.uftm.edu.br/opnsense/tutunas/config.xml
+pve-pet;51820;10.255.255.7;s;https://backups.uftm.edu.br/opnsense/pet/config.xml
+pve-centropark;51820;10.255.255.8;s;https://backups.uftm.edu.br/opnsense/centropark/config.xml
+pve-almoxarifado;51820;10.255.255.9;s;https://backups.uftm.edu.br/opnsense/almoxarifado/config.xml
 pve-odonto;51820;10.255.255.10;s;https://backups.uftm.edu.br/opnsense/odonto/config.xml
+pve-peiropolis;51820;10.255.255.11;s;https://backups.uftm.edu.br/opnsense/peiropolis/config.xml
+pve-academia;51820;10.255.255.12;s;https://backups.uftm.edu.br/opnsense/academia/config.xml
