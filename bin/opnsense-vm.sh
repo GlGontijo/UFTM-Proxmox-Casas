@@ -185,7 +185,7 @@ EOF
     
     CONFIG_OLD="config-$(date +%Y%m%d%H%M%S)"
     expect <<EOF
-set timeout 60
+set timeout 180
 spawn qm terminal ${VMID}
 send "\r"
 
