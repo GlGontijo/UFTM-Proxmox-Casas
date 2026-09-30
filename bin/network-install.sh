@@ -37,6 +37,7 @@ state_load
 IFACES_FILE="/etc/network/interfaces"
 IFACES_D="/etc/network/interfaces.d"
 PPPOE_IFACE_FILE="$IFACES_D/pppoe0"
+BRIDGE_SNAT="vnetsnat"
 PEER_NAME="pppoe0"
 PEER_FILE="/etc/ppp/peers/$PEER_NAME"
 SOURCE_LINE="source $IFACES_D/*"
