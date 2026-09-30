@@ -260,5 +260,112 @@ net.ipv4.conf.all.forwarding = 1
 EOF
 msg_ok "IPv4 Formard ajustado para todas as interfaces. Aplique sempre com 'sysctl --system'"
 
+# MASQUERADE para acesso da VM à internet e DNAT para acesso externo à VM
+msg_info "Criando regra de masquerade para a ${BRIDGE_SNAT} no OPNsense"
+MASQ_UP="/etc/network/if-up.d/99-uftm-masquerade-opnsense"
+MASQ_DOWN="/etc/network/if-post-down.d/99-uftm-masquerade-opnsense"
+rm -f "$MASQ_UP" "$MASQ_DOWN"
+
+cat >"$MASQ_UP" <<EOF
+#!/bin/bash
+# /etc/network/if-up.d/uftm-masquerade-opnsense
+# Gerado por network-install.sh --- MASQUERADE OPNsense
+
+TARGET_IFACE="${BRIDGE_SNAT}"
+SUBNET="172.31.0.0/30"
+
+[ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
+
+iptables -t nat -C POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE 2>/dev/null \
+  || iptables -t nat -A POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE
+logger -t uftm-network "MASQUERADE "\$SUBNET" -> "\$TARGET_IFACE" garantido"
+
+exit 0
+EOF
+  
+cat >"$MASQ_DOWN" <<EOF
+#!/bin/bash
+# /etc/network/if-post-down.d/uftm-snat-vnetsnat
+# Gerado por network-install.sh --- MASQUERADE OPNsense
+
+TARGET_IFACE="${BRIDGE_SNAT}"
+SUBNET="172.31.0.0/30"
+
+[ "\$IFACE" = "\$TARGET_IFACE" ] || exit 0
+
+iptables -t nat -D POSTROUTING -s "\$SUBNET" ! -o "\$TARGET_IFACE" -j MASQUERADE
+logger -t uftm-network "MASQUERADE "\$SUBNET" -> "\$TARGET_IFACE" removido"
+
+exit 0
+EOF
+
+chmod 0755 "$MASQ_UP" "$MASQ_DOWN"
+msg_ok "Hooks Masquerade $BRIDGE_SNAT -> OPNsense instalados (Necessários para acesso da VM à internet)"
+
+# ── DNAT 443 -> OPNsense (172.31.0.2) na WAN e no console ─────────
+msg_info "Criando regra de DNAT 80/443 para o OPNsense (Para acesso direto)"
+DNAT_UP="/etc/network/if-up.d/99-uftm-dnat-opnsense"
+DNAT_DOWN="/etc/network/if-post-down.d/99-uftm-dnat-opnsense"
+OPN_IP="172.31.0.2"
+rm -f "$DNAT_UP" "$DNAT_DOWN" 
+
+WAN_IF="$UFTM_WAN_BRIDGE"
+[[ "$UFTM_WAN_MODE" == "pppoe" ]] && WAN_IF="pppoe0"
+
+# "interface origem" -- WAN só para as faixas autorizadas; console aberto
+ENTRIES=()
+for src in $UFTM_FW_ALLOWED_IPS; do ENTRIES+=("$WAN_IF $src"); done
+[[ -n "${UFTM_CONSOLE_BRIDGE:-}" ]] && ENTRIES+=("$UFTM_CONSOLE_BRIDGE $UFTM_CONSOLE_CIDR")
+
+gen_entries() {
+  echo 'ENTRIES=('
+  for e in "${ENTRIES[@]}"; do printf '  "%s"\n' "$e"; done
+  echo ')'
+  echo "OPN_IP=\"$OPN_IP\""
+}
+
+{
+  echo '#!/bin/bash'
+  echo '# Gerado por network-install.sh -- DNAT 80/443 -> OPNsense'
+  gen_entries
+  cat <<'EOF'
+for e in "${ENTRIES[@]}"; do
+  read -r i src <<<"$e"
+  [ "$IFACE" = "$i" ] || continue
+  RULE80=(PREROUTING -i "$i" -s "$src" -p tcp --dport 80 -j DNAT --to-destination "$OPN_IP:80")
+  iptables -t nat -C "${RULE80[@]}" 2>/dev/null || iptables -t nat -A "${RULE80[@]}"
+  logger -t uftm-network "DNAT 80 $i ($src) -> $OPN_IP garantido"
+  
+  RULE443=(PREROUTING -i "$i" -s "$src" -p tcp --dport 443 -j DNAT --to-destination "$OPN_IP:443")
+  iptables -t nat -C "${RULE443[@]}" 2>/dev/null || iptables -t nat -A "${RULE443[@]}"
+  logger -t uftm-network "DNAT 443 $i ($src) -> $OPN_IP garantido"
+done
+
+exit 0
+EOF
+} >"$DNAT_UP"
+
+{
+  echo '#!/bin/bash'
+  echo '# Gerado por network-install.sh -- remove DNAT 80/443 -> OPNsense'
+  gen_entries
+  cat <<'EOF'
+for e in "${ENTRIES[@]}"; do
+  read -r i src <<<"$e"
+  [ "$IFACE" = "$i" ] || continue
+  RULE80=(PREROUTING -i "$i" -s "$src" -p tcp --dport 80 -j DNAT --to-destination "$OPN_IP:80")
+  while iptables -t nat -C "${RULE80[@]}" 2>/dev/null; do iptables -t nat -D "${RULE80[@]}"; done
+  
+  RULE443=(PREROUTING -i "$i" -s "$src" -p tcp --dport 443 -j DNAT --to-destination "$OPN_IP:443")
+  while iptables -t nat -C "${RULE443[@]}" 2>/dev/null; do iptables -t nat -D "${RULE443[@]}"; done
+done
+
+exit 0
+EOF
+} >"$DNAT_DOWN"
+
+chmod 0755 "$DNAT_UP" "$DNAT_DOWN"
+msg_ok "Hooks DNAT 80/443 -> OPNsense instalados (WAN: $WAN_IF${UFTM_CONSOLE_BRIDGE:+, console: $UFTM_CONSOLE_BRIDGE})"
+
 state_mark_step "network-install"
 msg_ok "network-install.sh concluído -- a aplicação de fato acontece no restart de rede da etapa 5 (hostname-and-restart.sh)."
