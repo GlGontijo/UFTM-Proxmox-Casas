@@ -54,7 +54,7 @@ while qm status "$VMID" &>/dev/null; do
         \n'SIM': OPNsense será instalado.\n'NÃO': Criação da VM será abortada." 0 0 ; then
       VMID=$((VMID + 1))
     else
-      masg_info "Instalação da VM cancelada pelo usuáŕio."
+      msg_info "Instalação da VM cancelada pelo usuáŕio."
       VMID=0
     fi
   fi
