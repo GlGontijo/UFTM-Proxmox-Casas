@@ -81,33 +81,57 @@ msg_ok "Mapeamento gravado em $BIND_CONF ($(wc -l <"$BIND_CONF") VLAN(s))"
 cat >"$BIND_SCRIPT" <<'BINDEOF'
 #!/bin/bash
 # uftm-evpn-bind-vlan.sh
-# Reconciliador de binds VLAN física <-> vnet EVPN. Não usa polling: fica
-# bloqueado em `ip monitor link` e só age quando o netlink emite um evento.
+# Reconciliador de binds VLAN física <-> vnet EVPN + MSS clamping por VLAN.
+# Sem polling: bloqueia em `ip monitor link` e age só em eventos relevantes.
 set -u
 CONF="/etc/uftm-proxmox-casas/vlan-binds.conf"
 LOG_TAG="uftm-evpn-bind"
 SUBIF_MTU=1360
+MSS=$((SUBIF_MTU - 40))
+MSS_CHAIN="UFTM-MSS"
 
-# nomes relevantes (phys + vnet de cada linha do CONF) -- usados só pra
-# filtrar eventos irrelevantes do "ip monitor link" antes de reconciliar.
-# Lido uma vez no início; se o CONF ganhar VLANs novas, reinicie o serviço
-# (systemctl restart uftm-evpn-bind-vlan.service) pra recarregar a lista.
+ipt() { iptables -w 5 -t mangle "$@"; }
+
 relevant_names() {
   [[ -f "$CONF" ]] || return
   while read -r phys vnet vlan; do
     [[ -z "$phys" || "$phys" == \#* ]] && continue
-    echo "$phys"
-    echo "$vnet"
+    echo "$phys"; echo "$vnet"
   done <"$CONF"
+}
+
+# ── MSS clamping (tráfego bridged => physdev + valor fixo) ──────────
+# Só as sub-interfaces das VLANs do fabric são casadas; a bridge principal
+# e as VLANs fora do EVPN não são afetadas. Não altera MTU de nada.
+mss_init() {
+  modprobe br_netfilter 2>/dev/null || true
+  [[ "$(cat /proc/sys/net/bridge/bridge-nf-call-iptables 2>/dev/null)" == "1" ]] \
+    || logger -t "$LOG_TAG" "AVISO: bridge-nf-call-iptables != 1, MSS clamp não verá tráfego bridged"
+  ipt -N "$MSS_CHAIN" 2>/dev/null || true
+  ipt -F "$MSS_CHAIN"   # limpa regras de VLANs removidas (só no início do serviço)
+  ipt -C FORWARD -j "$MSS_CHAIN" 2>/dev/null || ipt -I FORWARD 1 -j "$MSS_CHAIN"
+}
+
+ensure_mss() {
+  local phys="$1" dir
+  for dir in in out; do
+    local rule=("$MSS_CHAIN" -m physdev "--physdev-$dir" "$phys"
+                -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss "$MSS")
+    ipt -C "${rule[@]}" 2>/dev/null && continue
+    ipt -A "${rule[@]}" && logger -t "$LOG_TAG" "MSS $MSS ($dir) em $phys"
+  done
 }
 
 reconcile() {
   [[ -f "$CONF" ]] || { logger -t "$LOG_TAG" "config ausente: $CONF"; return; }
+  # garante a jump caso algo tenha recriado a chain FORWARD
+  ipt -C FORWARD -j "$MSS_CHAIN" 2>/dev/null || ipt -I FORWARD 1 -j "$MSS_CHAIN" 2>/dev/null
+
   while read -r phys vnet vlan; do
     [[ -z "$phys" || "$phys" == \#* ]] && continue
 
-    # cria a sub-interface 802.1Q se ainda não existir (a bridge trunk pai
-    # precisa já existir; se não existir ainda, tenta de novo no próximo evento)
+    ensure_mss "$phys"
+
     local_parent="${phys%.*}"
     if ! ip link show "$phys" &>/dev/null; then
       if ip link show "$local_parent" &>/dev/null; then
@@ -118,20 +142,13 @@ reconcile() {
       fi
     fi
     ip link set "$phys" up 2>/dev/null
-    ip link set "$phys" mtu "$SUBIF_MTU" 2>/dev/null
+    ip link set "$phys" mtu "$SUBIF_MTU" 2>/dev/null   # só a sub-interface
 
-    # garante membership do VID na entrada "self" da bridge trunk vlan-aware --
-    # `ip link add ... type vlan` fora do ifupdown2 não programa isso sozinho;
-    # sem essa entrada a bridge não consegue encaminhar unicast de volta pras
-    # portas físicas (broadcast passa por flood normal, unicast morre aqui).
-    # Idempotente: seguro rodar em toda reconciliação.
     if ip link show "$local_parent" &>/dev/null; then
       bridge vlan add vid "$vlan" dev "$local_parent" self 2>/dev/null \
         && logger -t "$LOG_TAG" "self-vlan $vlan garantida em $local_parent"
     fi
 
-    # só escraviza quando o vnet (bridge alvo) já existe -- ele é criado
-    # tardiamente pelo FRR/zebra, depois do networking.service
     if ip link show "$vnet" &>/dev/null; then
       cur_master=$(ip -o link show "$phys" | grep -oP 'master \K\S+' || true)
       if [[ "$cur_master" != "$vnet" ]]; then
@@ -142,17 +159,17 @@ reconcile() {
   done <"$CONF"
 }
 
-logger -t "$LOG_TAG" "iniciando reconciliação inicial"
+logger -t "$LOG_TAG" "iniciando reconciliação inicial (MSS=$MSS)"
+mss_init
 reconcile
 
 mapfile -t RELEVANT_NAMES < <(relevant_names)
-logger -t "$LOG_TAG" "monitorando eventos netlink (ip monitor link) -- filtrando por: ${RELEVANT_NAMES[*]}"
+logger -t "$LOG_TAG" "monitorando eventos netlink -- filtrando por: ${RELEVANT_NAMES[*]}"
 ip monitor link 2>/dev/null | while read -r line; do
   match=0
   for name in "${RELEVANT_NAMES[@]}"; do
     [[ "$line" == *"$name"* ]] || continue
-    match=1
-    break
+    match=1; break
   done
   [[ "$match" -eq 1 ]] || continue
   reconcile
