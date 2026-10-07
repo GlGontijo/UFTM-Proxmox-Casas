@@ -150,7 +150,7 @@ wizard() {
           return 0
         fi
       fi
-      br_name=$(whiptail --inputbox "Nome da bridge para $uso (ex: vmbr0):" 0 60 "vmbr$((RANDOM % 8))" 3>&2 2>&1 1>&3) || exit 1
+      br_name=$(whiptail --inputbox "Nome da bridge para $uso:" 0 60 "vmbr${nic//nic/}" 3>&2 2>&1 1>&3) || exit 1
       printf -v "$__outvar" '%s' "$br_name"
     }
   
