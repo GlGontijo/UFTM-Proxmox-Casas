@@ -248,7 +248,7 @@ wizard() {
   # 6) VLANs a provisionar no fabric EVPN
   # ═══════════════════════════════════════════════════════════════
   if [[ -z "${UFTM_SELECTED_VLANS:-}" ]]; then
-    DEFAULT_VLANS=(1010 1011 1012 1022 1054 1630)
+    DEFAULT_VLANS=(1010 1011 1012 1022 1054)
     VLAN_CHOICES=()
     for v in "${DEFAULT_VLANS[@]}"; do VLAN_CHOICES+=("$v" "VLAN $v" ON); done
     SELECTED_VLANS=$(whiptail --checklist "Selecione as VLANs a provisionar como vnet:" 0 70 8 \
@@ -303,9 +303,9 @@ wizard() {
   #    (NUNCA vai pro Git -- fica só no estado local deste host)
   # ═══════════════════════════════════════════════════════════════
   if [[ -z "${UFTM_FW_ALLOWED_IPS:-}" ]]; then
-    whiptail --msgbox "Agora informe as faixas de IP WAN da UFTM que podem acessar este host (SSH, 8006, WireGuard, SNMP).\n\nIP ou CIDR, separadas por espaço. Ex: 186.248.203.208/28 200.131.62.125 200.131.62.128/25" 0 78
+    whiptail --msgbox "Agora informe as faixas de IP WAN da UFTM que podem acessar este host (SSH, 8006, WireGuard, SNMP).\n\nIP ou CIDR, separadas por espaço. Ex: 186.248.203.208/28 200.131.62.0/23" 0 78
     FW_IPS=$(whiptail --inputbox "Faixas de IP (separadas por espaço):" 0 78 \
-      "186.248.203.208/28 200.131.62.125 200.131.62.128/25" 3>&2 2>&1 1>&3) || exit 1
+      "186.248.203.208/28 200.131.62.0/23" 3>&2 2>&1 1>&3) || exit 1
     [[ -z "$FW_IPS" ]] && { msg_error "É necessário pelo menos uma faixa de IP autorizada."; exit 1; }
     state_set UFTM_FW_ALLOWED_IPS "$FW_IPS"
     msg_ok "Faixas de IP autorizadas gravadas no estado local"
