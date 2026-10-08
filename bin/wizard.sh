@@ -248,7 +248,7 @@ wizard() {
   # 6) VLANs a provisionar no fabric EVPN
   # ═══════════════════════════════════════════════════════════════
   if [[ -z "${UFTM_SELECTED_VLANS:-}" ]]; then
-    DEFAULT_VLANS=(1010 1011 1012 1022 1054)
+    DEFAULT_VLANS=( 1010 1011 1012 1054 )
     VLAN_CHOICES=()
     for v in "${DEFAULT_VLANS[@]}"; do VLAN_CHOICES+=("$v" "VLAN $v" ON); done
     SELECTED_VLANS=$(whiptail --checklist "Selecione as VLANs a provisionar como vnet:" 0 70 8 \
