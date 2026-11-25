@@ -72,6 +72,11 @@ cat >"$CLUSTER_FW" <<EOF
 
 enable: 1
 
+[ALIASES]
+
+CIDR_MGMT 192.168.100.0/24 # CIDR Interface Management
+IP_MGMT 192.168.1.1 # IP Interface Manegement
+
 [IPSET ipswan-uftm] # Faixas de IPs WAN da UFTM (definidas no wizard)
 
 186.248.203.208/28
@@ -80,18 +85,19 @@ enable: 1
 [RULES]
 
 GROUP uftm_access # UFTM acesso remoto
-IN DHCPfwd(ACCEPT) -log info # DHCP Forward
-IN DNS(ACCEPT) -log info # DNS
-IN ACCEPT -dest +sdn/vnetsnat-all -log info # SNAT Traffic
-IN ACCEPT -i wg0 -log info # Wireguard Interface
+IN DHCPfwd(ACCEPT) -log notice # DHCP Forward
+IN DNS(ACCEPT) -log notice # DNS
+IN ACCEPT -dest +sdn/vnetsnat-all -log notice # SNAT Traffic
+IN ACCEPT -i wg0 -log notice # Wireguard Interface
+IN Ping(ACCEPT) -source dc/cidr_mgmt -dest dc/ip_mgmt -log notice # MGMT Interface - Ping
 
 [group uftm_access] # Regras para liberação de acesso remoto
 
-IN Ping(ACCEPT) -source +dc/ipswan-uftm -log info # Allow UFTM Access - Ping
-IN ACCEPT -source +dc/ipswan-uftm -p udp -dport 51820 -log info # Allow UFTM Access - Wireguard
-IN ACCEPT -source +dc/ipswan-uftm -p tcp -dport 8006 -log info # Allow UFTM Access - Proxmox
-IN SNMP(ACCEPT) -source +dc/ipswan-uftm -log info # Allow UFTM Access - SNMP
-IN SSH(ACCEPT) -source +dc/ipswan-uftm -log info # Allow UFTM Access - SSH
+IN Ping(ACCEPT) -source +dc/ipswan-uftm -log notice # Allow UFTM Access - Ping
+IN ACCEPT -source +dc/ipswan-uftm -p udp -dport 51820 -log notice # Allow UFTM Access - Wireguard
+IN ACCEPT -source +dc/ipswan-uftm -p tcp -dport 8006 -log notice # Allow UFTM Access - Proxmox
+IN SNMP(ACCEPT) -source +dc/ipswan-uftm -log notice # Allow UFTM Access - SNMP
+IN SSH(ACCEPT) -source +dc/ipswan-uftm -log notice # Allow UFTM Access - SSH
 EOF
 msg_ok "cluster.fw gravado (${UFTM_FW_ALLOWED_IPS// / , })"
 
