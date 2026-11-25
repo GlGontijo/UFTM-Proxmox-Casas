@@ -13,6 +13,12 @@
 
 set -euo pipefail
 
+# Determina a versão suportada do proxmox
+PVE_SUPPORTED_MIN='9.0.x'
+PVE_SUPPORTED_MAX='9.3.x'
+IFS='.' read -r PVE_MAJOR_MIN PVE_MINOR_MIN _ <<<"$(echo "$PVE_SUPPORTED_MIN")"
+IFS='.' read -r PVE_MAJOR_MAX PVE_MINOR_MAX _ <<<"$(echo "$PVE_SUPPORTED_MAX")"
+
 REPO_URL="https://github.com/GlGontijo/UFTM-Proxmox-Casas.git"
 REPO_DIR="/opt/uftm-proxmox-casas"
 BRANCH="main"
@@ -27,9 +33,6 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-PVE_VERSION="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
-IFS='.' read -r PVE_MAJOR PVE_MINOR _ <<<"$(echo "$PVE_VERSION")"
-
 PVE_SOURCES="/etc/apt/sources.list.d/pve-enterprise.sources"
 PVE_NOSUB="/etc/apt/sources.list.d/proxmox.sources"
 CEPH_SOURCES="/etc/apt/sources.list.d/ceph.sources"
@@ -41,16 +44,25 @@ else
 fi
 TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
 
+PVE_VERSION="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
+IFS='.' read -r PVE_MAJOR PVE_MINOR _ <<<"$(echo "$PVE_VERSION")"
+
 # __ Confere se a versão é suportada
 msg_info "Versão Proxmox detectada: $PVE_VERSION"
-if [[ "$PVE_MAJOR" == "9" ]]; then
-  if ((PVE_MINOR < 0 || PVE_MINOR > 3)); then
-    msg_error "Somente Proxmox 9.0-9.3.x é atualmente suportada"
+if [[ "$PVE_MAJOR" == "$PVE_MAJOR_MIN" ]]; then
+  if ((PVE_MINOR < PVE_MINOR_MIN)); then
+    msg_error "Somente Proxmox $PVE_SUPPORTED_MIN - $PVE_SUPPORTED_MAX é atualmente suportado"
+    exit 105
+  fi
+  msg_ok "Versão do Proxmox é suportada. Seguindo com a instalação..."
+elif [[ "$PVE_MAJOR" == "$PVE_MAJOR_MAX" ]]; then
+  if ((PVE_MINOR < PVE_MINOR_MIN)); then
+    msg_error "Somente Proxmox $PVE_SUPPORTED_MIN - $PVE_SUPPORTED_MAX é atualmente suportado"
     exit 105
   fi
   msg_ok "Versão do Proxmox é suportada. Seguindo com a instalação..."
 else
-  msg_error "Somente Proxmox 9.0-9.2.x é atualmente suportada"
+  msg_error "Somente Proxmox $PVE_SUPPORTED_MIN - $PVE_SUPPORTED_MAX é atualmente suportado"
   exit 105
 fi
 
@@ -123,9 +135,25 @@ msg_info "Atualizando índices de pacotes"
 apt-get update -qq
 msg_ok "Índices atualizados"
 
-msg_info "Executando dist-upgrade completo (pode demorar)"
-DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -qq
-msg_ok "Sistema atualizado"
+msg_info "Executando upgrade completo (pode demorar)"
+msg_info "Extrai a versão candidata de instalação do pve-manager"
+CANDIDATE_VER=$(apt-cache policy pve-manager | awk '/Candidate:/ {print $2}')
+
+if [[ -z "$CANDIDATE_VER" || "$CANDIDATE_VER" == "(none)" ]]; then
+  msg_info "Erro: Não foi possível obter a versão candidata do pve-manager.Executando apt upgrade (mantendo hold/bloqueio de major release)..."
+  DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+else
+  msg_info "Versão candidata detectada para pve-manager: $CANDIDATE_VER"
+  # Compara usando a lógica oficial do dpkg
+  if dpkg --compare-versions "$CANDIDATE_VER" ge "$PVE_SUPPORTED_MAX"; then
+    msg_info "Versão >= $PVE_SUPPORTED_MAX detectada. Executando apt upgrade (mantendo hold/bloqueio de major release)..."
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+  else
+    msg_info "Versão < 9.3 detectada. Executando apt dist-upgrade..."
+    DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -qq
+  fi
+  msg_ok "Sistema atualizado"
+fi
 
 # ── 5) Timezone (aplica direto, sem perguntar) ──────────────────
 CURRENT_TZ="$(timedatectl show -p Timezone --value 2>/dev/null || echo "?")"
