@@ -45,7 +45,7 @@ if [[ "$PVE_MAJOR" == "$PVE_MAJOR_MIN" ]]; then
   fi
   msg_ok "Versão do Proxmox é suportada. Seguindo com a instalação..."
 elif [[ "$PVE_MAJOR" == "$PVE_MAJOR_MAX" ]]; then
-  if ((PVE_MINOR < PVE_MINOR_MIN)); then
+  if ((PVE_MINOR > PVE_MINOR_MAX)); then
     msg_error "Somente Proxmox $PVE_SUPPORTED_MIN - $PVE_SUPPORTED_MAX é atualmente suportado"
     exit 105
   fi
@@ -57,13 +57,7 @@ fi
 
 PVE_SOURCES="/etc/apt/sources.list.d/pve-enterprise.sources"
 PVE_NOSUB="/etc/apt/sources.list.d/proxmox.sources"
-CEPH_SOURCES="/etc/apt/sources.list.d/ceph.sources"
 DEBIAN_SOURCES="/etc/apt/sources.list.d/debian.sources"
-if ((PVE_MINOR >= 2)); then
-  CEPH_RELEASE="ceph-tentacle"
-else
-  CEPH_RELEASE="ceph-squid"
-fi
 TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
 
 # ── Detecta codename (trixie no PVE 9) ─────────────────────────
@@ -141,16 +135,16 @@ CANDIDATE_VER=$(apt-cache policy pve-manager | awk '/Candidate:/ {print $2}')
 
 if [[ -z "$CANDIDATE_VER" || "$CANDIDATE_VER" == "(none)" ]]; then
   msg_info "Erro: Não foi possível obter a versão candidata do pve-manager.Executando apt upgrade (mantendo hold/bloqueio de major release)..."
-  DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+  DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq --fix-missing
 else
   msg_info "Versão candidata detectada para pve-manager: $CANDIDATE_VER"
   # Compara usando a lógica oficial do dpkg
   if dpkg --compare-versions "$CANDIDATE_VER" ge "$PVE_SUPPORTED_MAX"; then
-    msg_info "Versão >= $PVE_SUPPORTED_MAX detectada. Executando apt upgrade (mantendo hold/bloqueio de major release)..."
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+    msg_info "Versão > $PVE_SUPPORTED_MAX detectada. Executando apt upgrade (mantendo hold/bloqueio de major release)..."
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq --fix-missing
   else
-    msg_info "Versão < 9.3 detectada. Executando apt dist-upgrade..."
-    DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -qq
+    msg_info "Versão <= $PVE_SUPPORTED_MAX detectada. Executando apt dist-upgrade..."
+    DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -qq --fix-missing
   fi
   msg_ok "Sistema atualizado"
 fi
