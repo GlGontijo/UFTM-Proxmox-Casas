@@ -44,8 +44,8 @@ TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
 # __ Confere se a versão é suportada
 msg_info "Versão Proxmox detectada: $PVE_VERSION"
 if [[ "$PVE_MAJOR" == "9" ]]; then
-  if ((PVE_MINOR < 0 || PVE_MINOR > 2)); then
-    msg_error "Somente Proxmox 9.0-9.2.x é atualmente suportada"
+  if ((PVE_MINOR < 0 || PVE_MINOR > 3)); then
+    msg_error "Somente Proxmox 9.0-9.3.x é atualmente suportada"
     exit 105
   fi
   msg_ok "Versão do Proxmox é suportada. Seguindo com a instalação..."
