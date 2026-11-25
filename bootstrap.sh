@@ -33,17 +33,6 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-PVE_SOURCES="/etc/apt/sources.list.d/pve-enterprise.sources"
-PVE_NOSUB="/etc/apt/sources.list.d/proxmox.sources"
-CEPH_SOURCES="/etc/apt/sources.list.d/ceph.sources"
-DEBIAN_SOURCES="/etc/apt/sources.list.d/debian.sources"
-if ((PVE_MINOR >= 2)); then
-  CEPH_RELEASE="ceph-tentacle"
-else
-  CEPH_RELEASE="ceph-squid"
-fi
-TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
-
 PVE_VERSION="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
 IFS='.' read -r PVE_MAJOR PVE_MINOR _ <<<"$(echo "$PVE_VERSION")"
 
@@ -65,6 +54,17 @@ else
   msg_error "Somente Proxmox $PVE_SUPPORTED_MIN - $PVE_SUPPORTED_MAX é atualmente suportado"
   exit 105
 fi
+
+PVE_SOURCES="/etc/apt/sources.list.d/pve-enterprise.sources"
+PVE_NOSUB="/etc/apt/sources.list.d/proxmox.sources"
+CEPH_SOURCES="/etc/apt/sources.list.d/ceph.sources"
+DEBIAN_SOURCES="/etc/apt/sources.list.d/debian.sources"
+if ((PVE_MINOR >= 2)); then
+  CEPH_RELEASE="ceph-tentacle"
+else
+  CEPH_RELEASE="ceph-squid"
+fi
+TEST_SOURCES="/etc/apt/sources.list.d/pve-test.sources"
 
 # ── Detecta codename (trixie no PVE 9) ─────────────────────────
 CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
